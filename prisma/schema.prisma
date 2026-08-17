@@ -1,0 +1,3481 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  name          String?
+  email         String         @unique
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+  status        String         @default("ACTIVE") // ACTIVE, SUSPENDED, INACTIVE
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  archivedAt    DateTime?
+  deletedAt     DateTime?
+  createdBy     String?
+  updatedBy     String?
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       Profile?
+  networkMember NetworkMember?
+  userRoles     UserRole[]
+  auditLogs     AuditLog[]     @relation("ActorAuditLogs")
+  notifications Notification[]
+
+  // CRM Relations
+  ownedLeads         CrmLead[]        @relation("LeadOwner")
+  ownedOpportunities CrmOpportunity[] @relation("OpportunityOwner")
+  ownedAppointments  CrmAppointment[] @relation("AppointmentOwner")
+
+  // Community & Messaging Relations
+  communityPosts        CommunityPost[]           @relation("PostAuthor")
+  communityComments     CommunityComment[]        @relation("CommentAuthor")
+  communityReactions    CommunityReaction[]
+  mentionedIn           CommunityMention[]        @relation("MentionedUser")
+  createdMentions       CommunityMention[]        @relation("MentionCreator")
+  conversationMembers   ConversationParticipant[]
+  sentMessages          DirectMessage[]           @relation("MessageSender")
+  readReceipts          MessageReadReceipt[]
+  createdTrainings      TrainingModule[]          @relation("TrainingCreator")
+  assignedTrainings     TrainingAssignment[]      @relation("TrainingAssigner")
+  reviewedTrainings     TrainingProgress[]        @relation("TrainingReviewer")
+
+  // Module 08 Compensation Relations
+  initiatedRuns      CompensationRun[]        @relation("RunInitiator")
+  approvedRuns       CompensationRun[]        @relation("RunApprover")
+  postedRuns         CompensationRun[]        @relation("RunPoster")
+  createdAdjustments CompensationAdjustment[] @relation("AdjustmentCreator")
+
+  // Module 10 Digital Project Relations
+  ownedDigitalProjects   DigitalProject[]   @relation("ProjectOwner")
+  managedDigitalProjects DigitalProject[]   @relation("ProjectManager")
+  assignedProjectTasks   ProjectTask[]      @relation("ProjectTaskAssignee")
+  clientReviewsSubmitted ClientReview[]     @relation("ClientReviewer")
+  projectActivities      ProjectActivity[]  @relation("ProjectActivityActor")
+
+  // Module 12 Client Retention Relations
+  assignedRetentionCases  ClientRetentionCase[]   @relation("RetentionCaseOwner")
+  assignedRenewals        ClientRenewal[]         @relation("RenewalOwner")
+  performedTouchpoints    ClientTouchpoint[]      @relation("TouchpointPerformer")
+  ownedSuccessPlans       ClientSuccessPlan[]     @relation("SuccessPlanOwner")
+
+  // Module 13 Automation Relations
+  createdAutomationWorkflows AutomationWorkflow[] @relation("WorkflowCreator")
+
+  // Module 14 Notification Relations
+  notificationPreference       NotificationPreference?
+  createdNotificationTemplates NotificationTemplate[] @relation("TemplateCreator")
+  receivedNotificationMessages NotificationMessage[]  @relation("MessageRecipient")
+  createdNotificationCampaigns NotificationCampaign[] @relation("CampaignCreator")
+
+  // Module 15 AI Relations
+  aiConversations     AiConversation[]
+  aiInsights          AiInsight[]
+  createdAiPrompts    AiCoachingPrompt[] @relation("PromptCreator")
+  aiUsageQuota        AiUsageQuota?
+
+  // Module 20 Resilience Relations
+  createdResiliencePolicies ResiliencePolicy[]  @relation("ResiliencePolicyCreator")
+  createdRecoveryPlans      RecoveryPlan[]      @relation("RecoveryPlanCreator")
+  initiatedRecoveries       RecoveryExecution[] @relation("RecoveryInitiator")
+  ownedContinuityPlans      ContinuityPlan[]    @relation("ContinuityPlanOwner")
+
+  // Module 21 Document & Knowledge Relations
+  ownedFolders                DocumentFolder[]        @relation("FolderOwner")
+  ownedDocuments              Document[]              @relation("DocumentOwner")
+  createdDocumentVersions     DocumentVersion[]       @relation("VersionCreator")
+  grantedDocumentPermissions  DocumentPermission[]    @relation("PermissionGranter")
+  createdDocumentShares       DocumentShare[]         @relation("ShareCreator")
+  requestedDocumentApprovals  DocumentApproval[]      @relation("ApprovalRequester")
+  reviewedDocumentApprovals   DocumentApproval[]      @relation("ApprovalReviewer")
+  ownedKnowledgeCollections   KnowledgeCollection[]   @relation("CollectionOwner")
+  authoredKnowledgeEntries    KnowledgeEntry[]        @relation("KnowledgeAuthor")
+  approvedKnowledgeEntries    KnowledgeEntry[]        @relation("KnowledgeApprover")
+  createdDocumentRelations    DocumentRelation[]      @relation("RelationCreator")
+  documentActivities          DocumentActivityLog[]   @relation("DocumentActivityActor")
+  placedLegalHolds            RecordLegalHold[]       @relation("LegalHoldPlacer")
+  releasedLegalHolds          RecordLegalHold[]       @relation("LegalHoldReleaser")
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  displayName String?
+  avatarUrl   String?
+  phone       String?
+  bio         String?
+  timeZone    String   @default("Africa/Lagos")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NetworkMember {
+  id          String    @id @default(uuid())
+  memberCode  String    @unique // e.g. NM-10001
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String    @default("ACTIVE") // PROSPECT, ACTIVE, INACTIVE, AT_RISK, EXITED, ARCHIVED
+  joinedAt    DateTime  @default(now())
+  activatedAt DateTime?
+  exitedAt    DateTime?
+  exitReason  String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  sponsoredRelationships OrganizationRelationship[] @relation("SponsorMember")
+  memberRelationships    OrganizationRelationship[] @relation("TargetMember")
+  memberQualifications   MemberQualification[]
+  rankHistories          RankHistory[]
+
+  // Module 04 Productivity Relations
+  goals                  Goal[]
+  activityTemplates      ActivityTemplate[]
+  activityInstances      ActivityInstance[]
+  assignedTasks          Task[]                     @relation("TaskAssignee")
+  productivityScores     ProductivityScore[]
+
+  // Module 05 Finance Relations
+  financialAccounts      FinancialAccount[]
+  journalEntries         JournalEntry[]
+  paymentRequests        PaymentRequest[]
+
+  // Module 06 CRM Relations
+  convertedCrmLead       CrmLead?                   @relation("ConvertedLeadMember")
+
+  // Module 07 Community Relations
+  trainingAssignments    TrainingAssignment[]       @relation("AssignedMember")
+  attentionAlerts        LeadershipAttentionAlert[]
+
+  // Module 08 Compensation Relations
+  compensationResults    MemberCompensationResult[]
+  sourceEarningLines     EarningLineItem[]          @relation("SourceMemberLine")
+}
+
+model OrganizationRelationship {
+  id               String        @id @default(uuid())
+  memberId         String
+  member           NetworkMember @relation("TargetMember", fields: [memberId], references: [id], onDelete: Cascade)
+  sponsorId        String?
+  sponsor          NetworkMember? @relation("SponsorMember", fields: [sponsorId], references: [id], onDelete: SetNull)
+  relationshipType String        @default("SPONSOR") // SPONSOR, PLACEMENT
+  effectiveFrom    DateTime      @default(now())
+  effectiveTo      DateTime?     // NULL indicates active relationship
+  reason           String?       // INITIAL_JOIN, SPONSOR_CHANGE, RESTRUCTURING
+  createdBy        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([memberId, effectiveTo])
+  @@index([sponsorId, effectiveTo])
+  @@index([effectiveFrom, effectiveTo])
+}
+
+// =========================================================================
+// MODULE 03A & 03B — CONFIGURABLE NEO LIFE RANK & QUALIFICATION ENGINE MODELS
+// =========================================================================
+
+model CompensationPlan {
+  id          String        @id @default(uuid())
+  country     String        @default("NG") // ISO Country code e.g. NG, ZA, US
+  name        String        // e.g. NeoLife Nigeria Plan
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  versions    PlanVersion[]
+}
+
+model PlanVersion {
+  id            String                @id @default(uuid())
+  planId        String
+  plan          CompensationPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  versionName   String                // e.g. 2026.1
+  status        String                @default("ACTIVE") // DRAFT, ACTIVE, ARCHIVED
+  effectiveFrom DateTime              @default(now())
+  effectiveTo   DateTime?
+  description   String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  ranks               Rank[]
+  svbRates            SVBRateConfig[]
+  qualifications      MemberQualification[]
+  compensationRules   CompensationRule[]
+  compensationRuns    CompensationRun[]
+  memberResults       MemberCompensationResult[]
+}
+
+model Rank {
+  id            String            @id @default(uuid())
+  planVersionId String
+  planVersion   PlanVersion       @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  code          String            // DISTRIBUTOR, MANAGER, SENIOR_MANAGER, EXECUTIVE_MANAGER, DIRECTOR, EMERALD_DIRECTOR, SAPPHIRE_DIRECTOR...
+  name          String            // Manager
+  displayName   String            // Manager
+  level         Int               // 0, 1, 2, 3, 4, 5... (explicit ordering)
+  category      String            @default("DISTRIBUTOR_FAMILY") // DISTRIBUTOR_FAMILY, DIRECTOR_FAMILY, RUBY_FAMILY
+  description   String?
+  isActive      Boolean           @default(true)
+  isSystem      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  requirements             RankRequirement[]     @relation("TargetRank")
+  prerequisiteRequirements RankRequirement[]     @relation("PrerequisiteRank")
+  achievedQualifications   MemberQualification[] @relation("AchievedRank")
+  qualifiedQualifications  MemberQualification[] @relation("QualifiedRank")
+  rankHistories            RankHistory[]
+
+  @@unique([planVersionId, code])
+  @@unique([planVersionId, level])
+}
+
+model RankRequirement {
+  id                 String    @id @default(uuid())
+  rankId             String
+  rank               Rank      @relation("TargetRank", fields: [rankId], references: [id], onDelete: Cascade)
+  requirementType    String    // QPV_THRESHOLD, PPV_THRESHOLD, BV_THRESHOLD, GROUP_PV_THRESHOLD, QD_LEGS_THRESHOLD, CONSECUTIVE_MONTHS, PREREQUISITE_RANK, ACTIVE_STATUS
+  metric             String?   // PV, PPV, QPV, BV, GROUP_PV, QUALIFIED_DIRECTOR_LEGS, ACTIVE_STATUS, QUALIFIED_STATUS
+  threshold          Decimal?  @db.Decimal(14, 2)
+  comparisonOperator String    @default("GTE") // GTE, GT, LTE, LT, EQ
+  periodType         String    @default("MONTHLY") // MONTHLY, CONSECUTIVE
+  periodCount        Int       @default(1)
+  prerequisiteRankId String?
+  prerequisiteRank   Rank?     @relation("PrerequisiteRank", fields: [prerequisiteRankId], references: [id], onDelete: SetNull)
+  configurationJson  String?   // For custom or complex rules
+  description        String?
+  sortOrder          Int       @default(0)
+  isRequired         Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model SVBRateConfig {
+  id            String      @id @default(uuid())
+  planVersionId String
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  minQPV        Decimal     @db.Decimal(14, 2)
+  maxQPV        Decimal?    @db.Decimal(14, 2)
+  ratePercent   Decimal     @db.Decimal(5, 2) // e.g. 3.00, 5.00, 10.00, 15.00, 20.00, 25.00
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model QualificationPeriod {
+  id          String                @id @default(uuid())
+  year        Int
+  month       Int                   // 1 - 12
+  periodStart DateTime
+  periodEnd   DateTime
+  status      String                @default("OPEN") // OPEN, PROCESSING, CLOSED
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  memberQuals MemberQualification[]
+  compensationRuns CompensationRun[]
+  memberResults    MemberCompensationResult[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@unique([year, month], name: "year_month")
+}
+
+model MemberQualification {
+  id                      String              @id @default(uuid())
+  memberId                String
+  member                  NetworkMember       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  periodId                String
+  period                  QualificationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  planVersionId           String
+  planVersion             PlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  achievedRankId          String
+  achievedRank            Rank                @relation("AchievedRank", fields: [achievedRankId], references: [id])
+  qualifiedRankId         String
+  qualifiedRank           Rank                @relation("QualifiedRank", fields: [qualifiedRankId], references: [id])
+  pv                      Decimal             @default(0) @db.Decimal(14, 2)
+  ppv                     Decimal             @default(0) @db.Decimal(14, 2)
+  qpv                     Decimal             @default(0) @db.Decimal(14, 2)
+  bv                      Decimal             @default(0) @db.Decimal(14, 2)
+  svbRatePercent          Decimal             @default(0) @db.Decimal(5, 2)
+  activeStatus            Boolean             @default(true)
+  qualifiedStatus         String              @default("QUALIFIED") // QUALIFIED, NOT_QUALIFIED, PROVISIONAL, NOT_YET_EVALUATED
+  qualificationResultJson String?             // Detailed evaluation audit snapshot JSON
+  explanationJson         String?             // Human-readable explanation breakdown
+  evaluatedAt             DateTime            @default(now())
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  @@unique([memberId, periodId])
+}
+
+model RankHistory {
+  id            String        @id @default(uuid())
+  memberId      String
+  member        NetworkMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  rankId        String
+  rank          Rank          @relation(fields: [rankId], references: [id], onDelete: Cascade)
+  achievedAt    DateTime      @default(now())
+  effectiveFrom DateTime      @default(now())
+  effectiveTo   DateTime?
+  source        String        @default("SYSTEM_EVALUATION") // SYSTEM_EVALUATION, MANUAL_OVERRIDE
+  notes         String?
+  createdAt     DateTime      @default(now())
+}
+
+// =========================================================================
+// MODULE 04 — MEMBER PRODUCTIVITY & ACTIVITY ENGINE MODELS
+// =========================================================================
+
+model ActivityType {
+  id               String             @id @default(uuid())
+  code             String             @unique // e.g. PROSPECTING_COLD_DM, CLIENT_OUTREACH, BOOK_READING, SOCIAL_POST
+  name             String
+  category         String             @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, LEARNING, PERSONAL
+  measurementUnit  String             @default("COUNT") // COUNT, BOOLEAN, DURATION, CURRENCY, PERCENTAGE, REPORT
+  defaultTarget    Decimal?           @db.Decimal(14, 2)
+  requiresEvidence Boolean            @default(false)
+  weight           Decimal            @default(1.0) @db.Decimal(5, 2)
+  description      String?
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  templates        ActivityTemplate[]
+}
+
+model Goal {
+  id           String             @id @default(uuid())
+  memberId     String
+  member       NetworkMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  parentGoalId String?
+  parentGoal   Goal?              @relation("GoalHierarchy", fields: [parentGoalId], references: [id], onDelete: SetNull)
+  childGoals   Goal[]             @relation("GoalHierarchy")
+  title        String
+  description  String?
+  timeframe    String             @default("MONTHLY") // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  category     String             @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, LEARNING, PERSONAL
+  targetValue  Decimal            @db.Decimal(14, 2)
+  currentValue Decimal            @default(0) @db.Decimal(14, 2)
+  unit         String             @default("MEMBERS") // MEMBERS, QPV, PROSPECTS, CURRENCY, PERCENTAGE
+  startDate    DateTime
+  targetDate   DateTime
+  status       String             @default("IN_PROGRESS") // NOT_STARTED, IN_PROGRESS, COMPLETED, CANCELLED
+  privacyLevel String             @default("LEADER_VISIBLE") // PRIVATE, LEADER_VISIBLE, TEAM_VISIBLE, PUBLIC
+  assignedBy   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  tasks        Task[]
+  activities   ActivityTemplate[]
+
+  @@index([memberId, timeframe])
+}
+
+model ActivityTemplate {
+  id               String             @id @default(uuid())
+  activityTypeId   String
+  activityType     ActivityType       @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  memberId         String
+  member           NetworkMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  goalId           String?
+  goal             Goal?              @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  targetValue      Decimal            @db.Decimal(14, 2)
+  frequency        String             @default("DAILY") // DAILY, WEEKDAYS, WEEKLY, MONTHLY, CUSTOM
+  daysOfWeek       String?            // JSON array e.g. ["MON", "TUE", "WED", "THU", "FRI"]
+  requiresEvidence Boolean            @default(false)
+  effectiveFrom    DateTime           @default(now())
+  effectiveTo      DateTime?
+  assignedBy       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  instances        ActivityInstance[]
+
+  @@index([memberId, effectiveTo])
+}
+
+model ActivityInstance {
+  id             String           @id @default(uuid())
+  templateId     String
+  template       ActivityTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         NetworkMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  targetDate     DateTime         @db.Date // YYYY-MM-DD in member timezone
+  targetValue    Decimal          @db.Decimal(14, 2)
+  completedValue Decimal          @default(0) @db.Decimal(14, 2)
+  status         String           @default("PENDING") // PENDING, REPORTED, VERIFIED, MISSED, EXEMPT
+  submittedAt    DateTime?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  evidenceItems  Evidence[]
+
+  @@unique([templateId, targetDate])
+  @@index([memberId, targetDate])
+}
+
+model Evidence {
+  id                 String            @id @default(uuid())
+  activityInstanceId String?
+  activityInstance   ActivityInstance? @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
+  taskId             String?
+  task               Task?             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  storageKey         String            // Storage reference path/key
+  fileName           String
+  fileSize           Int
+  mimeType           String
+  publicUrl          String?
+  uploadedBy         String
+  status             String            @default("PENDING") // PENDING, APPROVED, REJECTED, NEEDS_REVISION
+  createdAt          DateTime          @default(now())
+  reviews            EvidenceReview[]
+
+  // Module 07 Community Relations
+  communityPosts     CommunityPost[]
+  directMessages     DirectMessage[]
+  trainingProgresses TrainingProgress[]
+
+  // Module 10 Project Deliverables
+  projectDeliverables ProjectDeliverable[]
+}
+
+model EvidenceReview {
+  id         String   @id @default(uuid())
+  evidenceId String
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  reviewerId String
+  status     String   // APPROVED, REJECTED, NEEDS_REVISION
+  feedback   String?
+  createdAt  DateTime @default(now())
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique // e.g. PROJ-ABC-LANDING
+  description String?
+  category    String   @default("DIGITAL_MARKETING") // DIGITAL_MARKETING, NETWORK_MARKETING, INTERNAL
+  status      String   @default("IN_PROGRESS") // PLANNING, IN_PROGRESS, ON_HOLD, COMPLETED, CANCELLED
+  startDate   DateTime?
+  dueDate     DateTime?
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+}
+
+model Task {
+  id          String        @id @default(uuid())
+  projectId   String?
+  project     Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  goalId      String?
+  goal        Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  assigneeId  String
+  assignee    NetworkMember @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  priority    String        @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status      String        @default("TODO") // TODO, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED
+  dueDate     DateTime?
+  completedAt DateTime?
+  assignedBy  String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  evidence    Evidence[]
+
+  crmFollowUps CrmFollowUp[]
+  projectTasks ProjectTask[]
+
+  @@index([assigneeId, status])
+}
+
+model ProductivityScore {
+  id            String        @id @default(uuid())
+  memberId      String
+  member        NetworkMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  periodType    String        @default("DAILY") // DAILY, WEEKLY, MONTHLY
+  startDate     DateTime
+  endDate       DateTime
+  activityScore Decimal       @db.Decimal(5, 2) // 0 - 100%
+  goalScore     Decimal       @db.Decimal(5, 2)
+  taskScore     Decimal       @db.Decimal(5, 2)
+  evidenceScore Decimal       @db.Decimal(5, 2)
+  overallScore  Decimal       @db.Decimal(5, 2)
+  currentStreak Int           @default(0)
+  longestStreak Int           @default(0)
+  calculatedAt  DateTime      @default(now())
+
+  @@unique([memberId, periodType, startDate])
+}
+
+// =========================================================================
+// MODULE 05 — DOUBLE-ENTRY FINANCIAL LEDGER & EARNINGS ENGINE MODELS
+// =========================================================================
+
+model FinancialAccount {
+  id            String         @id @default(uuid())
+  accountCode   String?        @unique // e.g. MEMBER_EARNINGS_NETWORK_NGN, COMPANY_CASH_NGN
+  memberId      String?
+  member        NetworkMember? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  accountType   String         @default("LIABILITY") // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  accountSubtype String        @default("MEMBER_PAYABLE") // MEMBER_PAYABLE, COMPANY_CASH, NETWORK_EXPENSE, DIGITAL_REVENUE, DIGITAL_EXPENSE, OUTSOURCING_EXPENSE
+  currency      String         @default("NGN") // NGN, USD
+  status        String         @default("ACTIVE") // ACTIVE, FROZEN, CLOSED
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  ledgerEntries   LedgerEntry[]
+  journalEntries  JournalEntry[]
+  paymentRequests PaymentRequest[]
+
+  @@index([memberId, currency])
+}
+
+model LedgerEntry {
+  id             String           @id @default(uuid())
+  accountId      String
+  account        FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  memberId       String
+  entryType      String           // CREDIT, DEBIT
+  category       String           // NETWORK_BONUS, OUTSOURCING_PAYOUT, WITHDRAWAL, ADJUSTMENT_CREDIT, ADJUSTMENT_DEBIT, FEE
+  businessDomain String           @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING
+  amount         Decimal          @db.Decimal(18, 4)
+  currency       String           @default("NGN")
+  status         String           @default("POSTED") // POSTED, PENDING_APPROVAL, VOIDED
+  referenceId    String?          // External transaction or payout ID
+  relatedEntryId String?          // For offsetting adjustment entries
+  description    String
+  metadataJson   String?          // Audit snapshot JSON
+  createdBy      String
+  createdAt      DateTime         @default(now())
+
+  paymentRequests PaymentRequest[] @relation("LedgerPaymentRequest")
+  disputes        FinancialDispute[]
+
+  @@index([accountId, createdAt])
+  @@index([memberId, currency, status])
+  @@index([businessDomain, category])
+}
+
+model JournalTransaction {
+  id             String         @id @default(uuid())
+  transactionNo  String         @unique // e.g. TXN-2026-0815-0001
+  referenceNo    String?        // External reference / invoice / project code
+  businessDomain String         @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, OUTSOURCING
+  sourceType     String         // NETWORK_SVB, DIGITAL_OUTSOURCING, WITHDRAWAL, ADJUSTMENT, REVERSAL
+  sourceEntityId String?        // ID of triggering entity (Project, Qualification, etc.)
+  currency       String         @default("NGN")
+  status         String         @default("POSTED") // DRAFT, POSTED, VOIDED
+  description    String
+  metadataJson   String?        // Context snapshot JSON
+  postedAt       DateTime       @default(now())
+  createdBy      String
+
+  entries                    JournalEntry[]
+  memberCompensationResult   MemberCompensationResult?
+  originalTxnAdjustments     CompensationAdjustment[] @relation("OriginalTxnAdjustments")
+  adjustmentTxn              CompensationAdjustment?  @relation("AdjustmentTxn")
+
+  @@index([businessDomain, sourceType])
+  @@index([postedAt])
+}
+
+model JournalEntry {
+  id             String             @id @default(uuid())
+  transactionId  String
+  transaction    JournalTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        FinancialAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         NetworkMember?     @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  entryType      String             // DEBIT, CREDIT
+  amount         Decimal            @db.Decimal(18, 4)
+  currency       String             @default("NGN")
+  description    String
+  relatedEntryId String?
+  createdAt      DateTime           @default(now())
+
+  paymentRequests PaymentRequest[]
+
+  @@index([accountId, createdAt])
+  @@index([memberId, currency])
+}
+
+model PaymentRequest {
+  id                String            @id @default(uuid())
+  memberId          String
+  member            NetworkMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  accountId         String
+  account           FinancialAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ledgerEntryId     String?
+  ledgerEntry       LedgerEntry?      @relation("LedgerPaymentRequest", fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+  journalEntryId    String?
+  journalEntry      JournalEntry?     @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  amount            Decimal           @db.Decimal(18, 4)
+  currency          String            @default("NGN")
+  domain            String            @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, OUTSOURCING
+  payoutMethod      String            @default("BANK_TRANSFER") // BANK_TRANSFER, CRYPTO, MOBILE_MONEY
+  payoutDetailsJson String            // Bank account or wallet details
+  status            String            @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED, DISPUTED, RESOLVED
+  rejectionReason   String?
+  requestedAt       DateTime          @default(now())
+  processedAt       DateTime?
+  processedBy       String?
+
+  disputes          FinancialDispute[]
+
+  @@index([memberId, status])
+}
+
+model FinancialDispute {
+  id               String          @id @default(uuid())
+  paymentRequestId String?
+  paymentRequest   PaymentRequest? @relation(fields: [paymentRequestId], references: [id], onDelete: SetNull)
+  ledgerEntryId    String?
+  ledgerEntry      LedgerEntry?    @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+  disputedBy       String
+  reason           String
+  status           String          @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, REJECTED
+  resolutionNotes  String?
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  createdAt        DateTime        @default(now())
+}
+
+model FinancialPeriod {
+  id          String   @id @default(uuid())
+  year        Int
+  month       Int
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("OPEN") // OPEN, CLOSED, AUDITED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([year, month])
+}
+
+// =========================================================================
+// MODULE 06 — LEAD, PROSPECT & FOLLOW-UP CRM ENGINE MODELS (11 CRM MODELS + DIGITAL CLIENT)
+// =========================================================================
+
+model CrmLead {
+  id                String         @id @default(uuid())
+  leadCode          String         @unique // e.g. LEAD-10001
+  firstName         String
+  lastName          String
+  displayName       String?
+  email             String?
+  phone             String?
+  normalizedPhone   String?
+  country           String         @default("NG")
+  city              String?
+  timezone          String         @default("Africa/Lagos")
+  companyName       String?
+  jobTitle          String?
+  website           String?
+  socialProfilesJson String?       // JSON object containing FB, IG, LinkedIn URLs
+  source            String         @default("MANUAL") // FACEBOOK, INSTAGRAM, LINKEDIN, TIKTOK, WHATSAPP, COLD_EMAIL, COLD_DM, REFERRAL, WEBSITE, MANUAL
+  sourceDetail      String?
+  ownerId           String
+  owner             User           @relation("LeadOwner", fields: [ownerId], references: [id])
+  status            String         @default("NEW") // NEW, CONTACTED, ENGAGED, QUALIFIED, APPOINTMENT_BOOKED, PROPOSAL_SENT, NEGOTIATION, WON, LOST, NURTURE, DORMANT, CONVERTED
+  leadType          String         @default("NETWORK_PROSPECT") // NETWORK_PROSPECT, DIGITAL_MARKETING_PROSPECT, CLIENT_PROSPECT, PARTNER_PROSPECT, GENERAL_LEAD
+  temperature       String         @default("COLD") // COLD, WARM, HOT
+  score             Int            @default(0)
+  convertedMemberId String?        @unique
+  convertedMember   NetworkMember? @relation("ConvertedLeadMember", fields: [convertedMemberId], references: [id], onDelete: SetNull)
+  convertedClientId String?        @unique
+  convertedClient   DigitalClient? @relation("ConvertedLeadClient", fields: [convertedClientId], references: [id], onDelete: SetNull)
+  notesSummary      String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  archivedAt        DateTime?
+
+  opportunities     CrmOpportunity[]
+  interactions      CrmInteraction[]
+  followUps         CrmFollowUp[]
+  appointments      CrmAppointment[]
+  notes             CrmNote[]
+  tags              CrmLeadTag[]
+  stageHistories    CrmStageHistory[]
+
+  @@index([ownerId, status])
+  @@index([leadType, temperature])
+  @@index([email, phone])
+}
+
+model CrmPipeline {
+  id          String        @id @default(uuid())
+  name        String
+  domain      String        @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, OUTSOURCING
+  description String?
+  isDefault   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  stages      CrmStage[]
+  opportunities CrmOpportunity[]
+}
+
+model CrmStage {
+  id             String         @id @default(uuid())
+  pipelineId     String
+  pipeline       CrmPipeline    @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name           String
+  code           String
+  winProbability Int            @default(10) // 0 - 100%
+  colorHex       String         @default("#7F1D1D")
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  opportunities  CrmOpportunity[]
+  fromHistories  CrmStageHistory[] @relation("FromStage")
+  toHistories    CrmStageHistory[] @relation("ToStage")
+
+  @@unique([pipelineId, code])
+}
+
+model CrmStageHistory {
+  id          String    @id @default(uuid())
+  leadId      String
+  lead        CrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromStageId String?
+  fromStage   CrmStage? @relation("FromStage", fields: [fromStageId], references: [id], onDelete: SetNull)
+  toStageId   String
+  toStage     CrmStage  @relation("ToStage", fields: [toStageId], references: [id], onDelete: Cascade)
+  movedBy     String
+  movedAt     DateTime  @default(now())
+  notes       String?
+}
+
+model CrmOpportunity {
+  id                String       @id @default(uuid())
+  leadId            String
+  lead              CrmLead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  pipelineId        String
+  pipeline          CrmPipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId           String
+  stage             CrmStage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  ownerId           String
+  owner             User         @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  businessDomain    String       @default("NETWORK_MARKETING") // NETWORK_MARKETING, DIGITAL_MARKETING, OUTSOURCING
+  title             String
+  value             Decimal      @default(0) @db.Decimal(14, 2)
+  currency          String       @default("NGN")
+  probability       Int          @default(50)
+  expectedCloseDate DateTime?
+  status            String       @default("OPEN") // OPEN, WON, LOST
+  lostReason        String?
+  wonAt             DateTime?
+  lostAt            DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  followUps         CrmFollowUp[]
+  appointments      CrmAppointment[]
+  digitalProjects   DigitalProject[]
+  contracts         ClientContract[]
+
+  @@index([leadId, status])
+  @@index([businessDomain, stageId])
+}
+
+model CrmInteraction {
+  id          String    @id @default(uuid())
+  leadId      String
+  lead        CrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String    @default("SOCIAL_DM") // CALL, EMAIL, SMS, SOCIAL_DM, WHATSAPP, MEETING, PRESENTATION, FOLLOW_UP, NOTE
+  direction   String    @default("OUTBOUND") // INBOUND, OUTBOUND
+  status      String    @default("COMPLETED") // COMPLETED, SCHEDULED, FAILED, NO_RESPONSE, CANCELLED
+  summary     String
+  occurredAt  DateTime  @default(now())
+  createdBy   String
+  createdAt   DateTime  @default(now())
+}
+
+model CrmFollowUp {
+  id            String          @id @default(uuid())
+  leadId        String
+  lead          CrmLead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   CrmOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  taskId        String?
+  task          Task?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  assignedToId  String
+  title         String
+  notes         String?
+  dueAt         DateTime
+  status        String          @default("PENDING") // PENDING, DUE, COMPLETED, SKIPPED, CANCELLED, OVERDUE
+  completedAt   DateTime?
+  createdBy     String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([assignedToId, dueAt, status])
+}
+
+model CrmAppointment {
+  id            String          @id @default(uuid())
+  leadId        String
+  lead          CrmLead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   CrmOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  ownerId       String
+  owner         User            @relation("AppointmentOwner", fields: [ownerId], references: [id])
+  title         String
+  startAt       DateTime
+  endAt         DateTime
+  location      String?
+  meetingLink   String?
+  status        String          @default("SCHEDULED") // SCHEDULED, COMPLETED, NO_SHOW, CANCELLED, RESCHEDULED
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([ownerId, startAt])
+}
+
+model CrmNote {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      CrmLead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  authorId  String
+  isPrivate Boolean  @default(false)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CrmTag {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  colorHex  String       @default("#7F1D1D")
+  createdAt DateTime     @default(now())
+  leads     CrmLeadTag[]
+}
+
+model CrmLeadTag {
+  leadId String
+  tagId  String
+  lead   CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag    CrmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+}
+
+model DigitalClient {
+  id          String   @id @default(uuid())
+  clientCode  String   @unique // e.g. CLT-10001
+  leadId      String?  @unique
+  lead        CrmLead? @relation("ConvertedLeadClient")
+  companyName String
+  contactName String
+  email       String?
+  phone       String?
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  digitalProjects     DigitalProject[]
+  clientPortalAccesses ClientPortalAccess[]
+  billingProfiles     BillingProfile[]
+  contracts           ClientContract[]
+  invoices            Invoice[]
+  payments            Payment[]
+  healthSnapshots       ClientHealthSnapshot[]
+  retentionCases        ClientRetentionCase[]
+  renewals              ClientRenewal[]
+  expansionOpportunities ClientExpansionOpportunity[]
+  touchpoints           ClientTouchpoint[]
+  riskSignals           ClientRiskSignal[]
+  successPlans          ClientSuccessPlan[]
+}
+
+// =========================================================================
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique // e.g. SUPER_ADMIN, ADMIN, LEADER, TEAM_LEADER, MEMBER
+  description String?
+  isSystem    Boolean          @default(false)
+  userRoles   UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  module      String           // system, network, productivity, finance, etc.
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String   // e.g. USER_LOGIN, GOAL_CREATED, REPORT_SUBMITTED, JOURNAL_POSTED
+  entityType String   // e.g. User, NetworkMember, JournalTransaction, PaymentRequest
+  entityId   String?
+  metadata   String?  // JSON stringified details
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String    @default("INFO") // INFO, SUCCESS, WARNING, ALERT
+  link      String?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  isPublic    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+// ==================================================
+// MODULE 07 — COMMUNITY, COMMUNICATION & LEADERSHIP ENGAGEMENT ENGINE
+// ==================================================
+
+model CommunityPost {
+  id                 String              @id @default(uuid())
+  authorId           String
+  author             User                @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  content            String
+  postType           String              @default("GENERAL") // ANNOUNCEMENT, GENERAL, TRAINING, MOTIVATION, TESTIMONY, ACHIEVEMENT, POLL, QUESTION, RESOURCE
+  visibility         String              @default("PUBLIC_COMMUNITY") // PUBLIC_COMMUNITY, TEAM, LEADERS_ONLY
+  targetTeamScopeId  String?             // References NetworkMember.id as team root node
+  evidenceId         String?
+  evidence           Evidence?           @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  isPinned           Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  archivedAt         DateTime?
+  deletedAt          DateTime?
+
+  comments           CommunityComment[]
+  reactions          CommunityReaction[] @relation("PostReactions")
+
+  @@index([authorId, createdAt])
+  @@index([visibility, targetTeamScopeId])
+  @@index([postType, createdAt])
+}
+
+model CommunityComment {
+  id                 String              @id @default(uuid())
+  postId             String
+  post               CommunityPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId           String
+  author             User                @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  parentId           String?
+  parent             CommunityComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies            CommunityComment[]  @relation("CommentReplies")
+  content            String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+
+  reactions          CommunityReaction[] @relation("CommentReactions")
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+}
+
+model CommunityReaction {
+  id                 String              @id @default(uuid())
+  targetType         String              // POST, COMMENT, MESSAGE
+  targetId           String
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactionType       String              // LIKE, LOVE, CELEBRATE, SUPPORT, PRAY
+  createdAt          DateTime            @default(now())
+
+  // Foreign key relations for referential integrity
+  postId             String?
+  post               CommunityPost?      @relation("PostReactions", fields: [postId], references: [id], onDelete: Cascade)
+  commentId          String?
+  comment            CommunityComment?   @relation("CommentReactions", fields: [commentId], references: [id], onDelete: Cascade)
+  messageId          String?
+  message            DirectMessage?      @relation("MessageReactions", fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([targetType, targetId, userId])
+  @@index([targetType, targetId])
+  @@index([userId])
+}
+
+model CommunityMention {
+  id                 String              @id @default(uuid())
+  targetType         String              // POST, COMMENT
+  targetId           String
+  mentionedUserId    String
+  mentionedUser      User                @relation("MentionedUser", fields: [mentionedUserId], references: [id], onDelete: Cascade)
+  createdById        String
+  createdBy          User                @relation("MentionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt          DateTime            @default(now())
+
+  @@index([mentionedUserId, createdAt])
+}
+
+model Conversation {
+  id                 String              @id @default(uuid())
+  type               String              @default("DIRECT") // DIRECT, GROUP, TEAM
+  title              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  participants       ConversationParticipant[]
+  messages           DirectMessage[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id                 String              @id @default(uuid())
+  conversationId     String
+  conversation       Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt           DateTime            @default(now())
+  lastReadAt         DateTime?
+  isArchived         Boolean             @default(false)
+
+  @@unique([conversationId, userId])
+  @@index([userId, isArchived])
+}
+
+model DirectMessage {
+  id                 String              @id @default(uuid())
+  conversationId     String
+  conversation       Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId           String
+  sender             User                @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  content            String
+  evidenceId         String?
+  evidence           Evidence?           @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  sentAt             DateTime            @default(now())
+  deliveredAt        DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  readReceipts       MessageReadReceipt[]
+  reactions          CommunityReaction[] @relation("MessageReactions")
+
+  @@index([conversationId, sentAt])
+  @@index([senderId, sentAt])
+}
+
+model MessageReadReceipt {
+  id                 String              @id @default(uuid())
+  messageId          String
+  message            DirectMessage       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  readerId           String
+  reader             User                @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  readAt             DateTime            @default(now())
+
+  @@unique([messageId, readerId])
+  @@index([readerId, readAt])
+}
+
+model TrainingModule {
+  id                 String              @id @default(uuid())
+  title              String
+  description        String
+  category           String              @default("GENERAL") // LEADERSHIP, PRODUCT, SALES, NETWORK, ONBOARDING
+  content            String
+  resourceUrl        String?
+  durationMinutes    Int                 @default(30)
+  sortOrder          Int                 @default(0)
+  published          Boolean             @default(true)
+  createdById        String
+  createdBy          User                @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  archivedAt         DateTime?
+
+  assignments        TrainingAssignment[]
+
+  @@index([category, published])
+}
+
+model TrainingAssignment {
+  id                 String              @id @default(uuid())
+  trainingId         String
+  training           TrainingModule      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  assignedToMemberId String
+  assignedToMember   NetworkMember       @relation("AssignedMember", fields: [assignedToMemberId], references: [id], onDelete: Cascade)
+  assignedById       String
+  assignedBy         User                @relation("TrainingAssigner", fields: [assignedById], references: [id], onDelete: Restrict)
+  assignedScopeType  String              @default("INDIVIDUAL") // INDIVIDUAL, TEAM, ORG, ROLE, RANK
+  assignedScopeValue String?             // e.g. team root memberId or role code
+  dueAt              DateTime?
+  priority           String              @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status             String              @default("ASSIGNED") // ASSIGNED, STARTED, IN_PROGRESS, COMPLETED, OVERDUE, CANCELLED
+  assignedAt         DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  progress           TrainingProgress?
+
+  @@unique([trainingId, assignedToMemberId])
+  @@index([assignedToMemberId, status])
+  @@index([assignedById, status])
+}
+
+model TrainingProgress {
+  id                 String              @id @default(uuid())
+  assignmentId       String              @unique
+  assignment         TrainingAssignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  progressPercent    Int                 @default(0)
+  status             String              @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, REVISION_REQUIRED
+  evidenceId         String?
+  evidence           Evidence?           @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  reviewedById       String?
+  reviewedBy         User?               @relation("TrainingReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewerNotes      String?
+  reviewedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([assignmentId, status])
+}
+
+model LeadershipAttentionAlert {
+  id                 String              @id @default(uuid())
+  memberId           String
+  member             NetworkMember       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  alertType          String              // OVERDUE_TRAINING, INACTIVITY, UNANSWERED_MESSAGE, PRODUCTIVITY_DROP, RECENT_EXIT_WARNING
+  riskLevel          String              @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  reasonsJson        String              // JSON array of explainable reasons
+  isResolved         Boolean             @default(false)
+  resolvedAt         DateTime?
+  resolvedById       String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([memberId, isResolved])
+  @@index([riskLevel, isResolved])
+}
+
+// =========================================================================
+// MODULE 08 — NIGERIA NEOLIFE COMPENSATION & EARNINGS CALCULATION ENGINE
+// =========================================================================
+
+model CompensationRule {
+  id                 String       @id @default(uuid())
+  planVersionId      String
+  planVersion        PlanVersion  @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  code               String       // e.g. SVB_RULES, LDB_RULES, NDB_RULES, RANK_BONUS_DIRECTOR
+  name               String       // e.g. Sales Volume Bonus Rule 2026
+  category           String       // SVB, LDB, NDB, RANK_BONUS, LEADERSHIP_BONUS, OTHER_CONFIGURED_COMPENSATION
+  status             String       @default("ACTIVE") // ACTIVE, UNCONFIGURED, DEPRECATED
+  effectiveFrom      DateTime     @default(now())
+  effectiveTo        DateTime?
+  priority           Int          @default(1)
+  currency           String       @default("NGN")
+  configurationJson  String?      // Flexible JSON payload describing qualification criteria & formula base
+  description        String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  earningLines       EarningLineItem[]
+
+  @@unique([planVersionId, code])
+}
+
+model CompensationRun {
+  id                 String               @id @default(uuid())
+  periodId           String
+  period             QualificationPeriod  @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  planVersionId      String
+  planVersion        PlanVersion          @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  countryCode        String               @default("NG")
+  status             String               @default("DRAFT") // DRAFT, CALCULATING, CALCULATED, REVIEW_REQUIRED, APPROVED, POSTING, POSTED, FAILED, CANCELLED
+  calculationVersion String               @default("v1.0.0")
+  totalMembersCount  Int                  @default(0)
+  totalGrossAmount   Decimal              @default(0) @db.Decimal(18, 4)
+  currency           String               @default("NGN")
+  initiatedById      String
+  initiatedBy        User                 @relation("RunInitiator", fields: [initiatedById], references: [id])
+  approvedById       String?
+  approvedBy         User?                @relation("RunApprover", fields: [approvedById], references: [id])
+  postedById         String?
+  postedBy           User?                @relation("RunPoster", fields: [postedById], references: [id])
+  startedAt          DateTime             @default(now())
+  completedAt        DateTime?
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  resultSummaryJson  String?              // Category totals breakdown JSON
+  errorSummaryJson   String?              // Warnings and unconfigured rule logs
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  memberResults      MemberCompensationResult[]
+
+  @@unique([periodId, planVersionId, countryCode])
+}
+
+model MemberCompensationResult {
+  id                    String              @id @default(uuid())
+  compensationRunId     String
+  compensationRun        CompensationRun     @relation(fields: [compensationRunId], references: [id], onDelete: Restrict)
+  memberId              String
+  member                NetworkMember       @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  periodId              String
+  period                QualificationPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  planVersionId         String
+  planVersion           PlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  achievedRankCode      String
+  qualifiedRankCode     String
+  qualifyingQPV         Decimal             @db.Decimal(14, 2)
+  qualifyingPPV         Decimal             @db.Decimal(14, 2)
+  grossCalculatedAmount Decimal             @db.Decimal(18, 4)
+  adjustmentsAmount     Decimal             @default(0) @db.Decimal(18, 4)
+  finalPayableAmount    Decimal             @db.Decimal(18, 4)
+  currency              String              @default("NGN")
+  status                String              @default("CALCULATED") // CALCULATED, APPROVED, POSTED, ADJUSTED, CANCELLED
+  postedTransactionId   String?             @unique
+  postedTransaction     JournalTransaction? @relation(fields: [postedTransactionId], references: [id], onDelete: SetNull)
+  explanationJson       String?             // Explainable human-readable breakdown
+  snapshotJson          String              // Complete historical input & qualification snapshot JSON
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  earningLines          EarningLineItem[]
+  adjustments           CompensationAdjustment[]
+
+  @@unique([compensationRunId, memberId])
+  @@index([memberId, periodId])
+}
+
+model EarningLineItem {
+  id                         String                   @id @default(uuid())
+  memberCompensationResultId String
+  result                     MemberCompensationResult @relation(fields: [memberCompensationResultId], references: [id], onDelete: Cascade)
+  compensationRuleId         String?
+  compensationRule           CompensationRule?        @relation(fields: [compensationRuleId], references: [id], onDelete: SetNull)
+  category                   String                   // SVB, LDB, NDB, RANK_BONUS, LEADERSHIP_BONUS, OTHER_CONFIGURED_COMPENSATION
+  sourceMemberId             String?                  // Downline member triggering leadership bonus
+  sourceMember               NetworkMember?           @relation("SourceMemberLine", fields: [sourceMemberId], references: [id], onDelete: SetNull)
+  baseAmount                 Decimal                  @db.Decimal(18, 4) // QPV or BV base volume
+  rateOrFormulaRef           String                   // e.g. "10% (SVB Tier 1,000 - 1,999 QPV)"
+  calculatedAmount           Decimal                  @db.Decimal(18, 4)
+  currency                   String                   @default("NGN")
+  eligibilityStatus          String                   @default("QUALIFIED") // QUALIFIED, UNCONFIGURED, INELIGIBLE
+  explanationJson            String?
+  snapshotJson               String?                  // Organization generation & source member historical snapshot
+  createdAt                  DateTime                 @default(now())
+
+  @@index([memberCompensationResultId, category])
+}
+
+model CompensationAdjustment {
+  id                           String                   @id @default(uuid())
+  originalCompensationResultId String
+  originalResult               MemberCompensationResult @relation(fields: [originalCompensationResultId], references: [id], onDelete: Restrict)
+  originalJournalTransactionId String?
+  originalJournalTransaction   JournalTransaction?      @relation("OriginalTxnAdjustments", fields: [originalJournalTransactionId], references: [id], onDelete: SetNull)
+  journalTransactionId         String?                  @unique
+  journalTransaction           JournalTransaction?      @relation("AdjustmentTxn", fields: [journalTransactionId], references: [id], onDelete: SetNull)
+  adjustedAmount               Decimal                  @db.Decimal(18, 4)
+  currency                     String                   @default("NGN")
+  reason                       String
+  createdByUserId              String
+  createdByUser                User                     @relation("AdjustmentCreator", fields: [createdByUserId], references: [id])
+  createdAt                    DateTime                 @default(now())
+}
+
+// =========================================================================
+// MODULE 09 — EXECUTIVE INTELLIGENCE, ANALYTICS & REPORTING ENGINE MODELS
+// =========================================================================
+
+model AnalyticsSnapshot {
+  id            String               @id @default(uuid())
+  scopeType     String               // GLOBAL, TEAM, MEMBER
+  scopeId       String?              // memberId or teamRootMemberId
+  periodId      String?
+  period        QualificationPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  metricKey     String               // e.g. "qualification_rate", "qpv_trend", "crm_pipeline_value"
+  metricValue   Decimal              @db.Decimal(18, 4)
+  metricUnit    String               // COUNT, CURRENCY, PERCENT, RATIO, SCORE
+  metadataJson  String?              // Itemized breakdowns, trend comparisons, breakdown objects
+  sourceVersion String               @default("v1.0.0")
+  calculatedAt  DateTime             @default(now())
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([scopeType, scopeId, periodId])
+  @@index([metricKey, periodId])
+}
+
+// =========================================================================
+// MODULE 10 — DIGITAL CLIENT, PROJECT & SERVICE DELIVERY ENGINE MODELS
+// =========================================================================
+
+model DigitalService {
+  id                  String           @id @default(uuid())
+  code                String           @unique // e.g. GOHIGHLEVEL_SETUP, WEBSITE, FUNNEL, N8N_AUTOMATION, AI_AGENT
+  name                String
+  description         String?
+  category            String           @default("DIGITAL_MARKETING") // DIGITAL_MARKETING, OUTSOURCING, AUTOMATION, CONSULTING
+  defaultDurationDays Int              @default(14)
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  projects  DigitalProject[]
+  templates ProjectTemplate[]
+  invoiceLineItems InvoiceLineItem[]
+}
+
+model DigitalProject {
+  id               String            @id @default(uuid())
+  projectCode      String            @unique // e.g. PRJ-10001
+  clientId         String
+  client           DigitalClient     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  crmOpportunityId String?
+  crmOpportunity   CrmOpportunity?   @relation(fields: [crmOpportunityId], references: [id], onDelete: SetNull)
+  serviceId        String?
+  service          DigitalService?   @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  ownerId          String
+  owner            User              @relation("ProjectOwner", fields: [ownerId], references: [id])
+  projectManagerId String?
+  projectManager   User?             @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  status           String            @default("DRAFT") // DRAFT, PLANNED, ACTIVE, CLIENT_REVIEW, REVISION_REQUIRED, COMPLETED, ARCHIVED, CANCELLED
+  priority         String            @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  startDate        DateTime?
+  targetEndDate    DateTime?
+  completedAt      DateTime?
+  currency         String            @default("NGN")
+  contractValue    Decimal           @default(0) @db.Decimal(14, 2)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  milestones       DigitalMilestone[]
+  tasks            ProjectTask[]
+  deliverables     ProjectDeliverable[]
+  clientReviews    ClientReview[]
+  activities       ProjectActivity[]
+  portalAccesses   ClientPortalAccess[]
+  contracts        ClientContract[]
+  billingSchedules BillingSchedule[]
+  invoices         Invoice[]
+
+  @@index([clientId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([crmOpportunityId])
+  @@index([projectCode])
+}
+
+model DigitalMilestone {
+  id          String             @id @default(uuid())
+  projectId   String
+  project     DigitalProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sequence    Int                @default(1)
+  status      String             @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, BLOCKED
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tasks        ProjectTask[]
+  deliverables ProjectDeliverable[]
+
+  @@index([projectId, sequence])
+  @@index([status, dueDate])
+}
+
+model ProjectTask {
+  id             String            @id @default(uuid())
+  projectId      String
+  project        DigitalProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId    String?
+  milestone      DigitalMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignedToId   String?
+  assignedTo     User?             @relation("ProjectTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  taskId         String?
+  task           Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  title          String
+  description    String?
+  status         String            @default("TODO") // TODO, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED
+  priority       String            @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate        DateTime?
+  completedAt    DateTime?
+  estimatedHours Decimal           @default(0) @db.Decimal(8, 2)
+  actualHours    Decimal           @default(0) @db.Decimal(8, 2)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([projectId, status])
+  @@index([assignedToId])
+  @@index([dueDate])
+}
+
+model ProjectDeliverable {
+  id          String            @id @default(uuid())
+  projectId   String
+  project     DigitalProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  milestone   DigitalMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  type        String            @default("FILE") // FILE, LINK, DOCUMENT, PROTOTYPE, DEPLOYMENT
+  status      String            @default("DRAFT") // DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, REVISION_REQUIRED
+  version     Int               @default(1)
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  evidenceId  String?
+  evidence    Evidence?         @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  reviews     ClientReview[]
+
+  @@index([projectId, status])
+}
+
+model ClientReview {
+  id            String             @id @default(uuid())
+  projectId     String
+  project       DigitalProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverableId String
+  deliverable   ProjectDeliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  requestedAt   DateTime           @default(now())
+  reviewedAt    DateTime?
+  status        String             @default("PENDING") // PENDING, APPROVED, REVISION_REQUESTED
+  feedback      String?
+  reviewedById  String?
+  reviewedBy    User?              @relation("ClientReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([projectId, deliverableId])
+}
+
+model ProjectActivity {
+  id           String         @id @default(uuid())
+  projectId    String
+  project      DigitalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId      String
+  actor        User           @relation("ProjectActivityActor", fields: [actorId], references: [id])
+  activityType String         // PROJECT_CREATED, STATUS_CHANGED, MILESTONE_COMPLETED, DELIVERABLE_SUBMITTED, REVIEW_SUBMITTED, REVISION_REQUESTED, CLIENT_ACCESS_GRANTED
+  visibility   String         @default("INTERNAL") // INTERNAL, CLIENT_VISIBLE
+  description  String
+  metadataJson String?
+  createdAt    DateTime       @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+model ClientPortalAccess {
+  id           String         @id @default(uuid())
+  clientId     String
+  client       DigitalClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projectId    String
+  project      DigitalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  email        String
+  status       String         @default("ACTIVE") // ACTIVE, REVOKED
+  lastAccessAt DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([projectId, email])
+  @@index([clientId])
+  @@index([email])
+}
+
+model ProjectTemplate {
+  id                  String                      @id @default(uuid())
+  code                String                      @unique
+  name                String
+  description         String?
+  serviceId           String?
+  service             DigitalService?             @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  estimatedDurationDays Int                       @default(30)
+  isActive            Boolean                     @default(true)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  milestones          ProjectTemplateMilestone[]
+}
+
+model ProjectTemplateMilestone {
+  id          String          @id @default(uuid())
+  templateId  String
+  template    ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sequence    Int             @default(1)
+  dayOffset   Int             @default(7)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([templateId, sequence])
+}
+
+// =========================================================================
+// MODULE 11 — CLIENT BILLING, INVOICING & PAYMENT COLLECTION ENGINE MODELS (8 MODELS)
+// =========================================================================
+
+model BillingProfile {
+  id                   String        @id @default(uuid())
+  clientId             String
+  client               DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  billingName          String
+  billingEmail         String
+  billingPhone         String?
+  billingAddress       String?
+  taxIdentifier        String?
+  currency             String        @default("NGN")
+  paymentTermsDays     Int           @default(30)
+  defaultPaymentMethod String        @default("BANK_TRANSFER") // BANK_TRANSFER, CARD, DIRECT_DEBIT, MANUAL
+  status               String        @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([clientId])
+}
+
+model ClientContract {
+  id               String          @id @default(uuid())
+  contractCode     String          @unique // e.g. CTR-2026-10001
+  clientId         String
+  client           DigitalClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  crmOpportunityId String?
+  crmOpportunity   CrmOpportunity? @relation(fields: [crmOpportunityId], references: [id], onDelete: SetNull)
+  projectId        String?
+  project          DigitalProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  contractValue    Decimal         @default(0) @db.Decimal(14, 2)
+  currency         String          @default("NGN")
+  startDate        DateTime?
+  endDate          DateTime?
+  status           String          @default("DRAFT") // DRAFT, PENDING_SIGNATURE, ACTIVE, PAUSED, COMPLETED, TERMINATED, CANCELLED
+  paymentTerms     String          @default("NET_30")
+  signedAt         DateTime?
+  terminatedAt     DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  schedules        BillingSchedule[]
+  invoices         Invoice[]
+  renewals         ClientRenewal[]
+
+  @@index([clientId])
+  @@index([projectId])
+  @@index([status])
+}
+
+model BillingSchedule {
+  id           String          @id @default(uuid())
+  contractId   String?
+  contract     ClientContract? @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  projectId    String?
+  project      DigitalProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  frequency    String          @default("MONTHLY") // ONE_TIME, WEEKLY, MONTHLY, QUARTERLY, CUSTOM
+  amount       Decimal         @default(0) @db.Decimal(14, 2)
+  currency     String          @default("NGN")
+  nextDueDate  DateTime
+  startDate    DateTime
+  endDate      DateTime?
+  status       String          @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, CANCELLED
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  invoices     Invoice[]
+
+  @@index([contractId])
+  @@index([projectId])
+  @@index([status, nextDueDate])
+}
+
+model Invoice {
+  id                String              @id @default(uuid())
+  invoiceNumber     String              @unique // e.g. INV-2026-000001
+  clientId          String
+  client            DigitalClient       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contractId        String?
+  contract          ClientContract?     @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  projectId         String?
+  project           DigitalProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  billingScheduleId String?
+  billingSchedule   BillingSchedule?    @relation(fields: [billingScheduleId], references: [id], onDelete: SetNull)
+  currency          String              @default("NGN")
+  subtotal          Decimal             @default(0) @db.Decimal(18, 4)
+  taxAmount         Decimal             @default(0) @db.Decimal(18, 4)
+  discountAmount    Decimal             @default(0) @db.Decimal(18, 4)
+  totalAmount       Decimal             @default(0) @db.Decimal(18, 4)
+  amountPaid        Decimal             @default(0) @db.Decimal(18, 4)
+  amountDue         Decimal             @default(0) @db.Decimal(18, 4)
+  issueDate         DateTime            @default(now())
+  dueDate           DateTime
+  status            String              @default("DRAFT") // DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, VOID, CANCELLED
+  notes             String?
+  paymentReference  String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  lineItems         InvoiceLineItem[]
+  payments          Payment[]
+  allocations       PaymentAllocation[]
+  reminders         BillingReminder[]
+
+  @@index([clientId])
+  @@index([contractId])
+  @@index([projectId])
+  @@index([status, dueDate])
+}
+
+model InvoiceLineItem {
+  id          String          @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal         @default(1) @db.Decimal(18, 4)
+  unitPrice   Decimal         @default(0) @db.Decimal(18, 4)
+  amount      Decimal         @default(0) @db.Decimal(18, 4)
+  serviceId   String?
+  service     DigitalService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  projectId   String?
+  createdAt   DateTime        @default(now())
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id                    String              @id @default(uuid())
+  paymentReference      String              @unique // e.g. PAY-2026-10001
+  invoiceId             String?
+  invoice               Invoice?            @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  clientId              String
+  client                DigitalClient       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount                Decimal             @default(0) @db.Decimal(18, 4)
+  currency              String              @default("NGN")
+  paymentMethod         String              @default("BANK_TRANSFER") // BANK_TRANSFER, CARD, DIRECT_DEBIT, MANUAL
+  provider              String              @default("MANUAL") // MANUAL, MOCK, FLUTTERWAVE, PAYSTACK, STRIPE
+  providerTransactionId String?             @unique
+  status                String              @default("PENDING") // PENDING, PROCESSING, SUCCEEDED, FAILED, CANCELLED, REFUNDED, RECONCILED
+  receivedAt            DateTime?
+  reconciledAt          DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  allocations           PaymentAllocation[]
+
+  @@index([clientId])
+  @@index([invoiceId])
+  @@index([status])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(uuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Decimal  @default(0) @db.Decimal(18, 4)
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([invoiceId])
+}
+
+model BillingReminder {
+  id           String    @id @default(uuid())
+  invoiceId    String
+  invoice      Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  type         String    @default("UPCOMING") // UPCOMING, DUE_TODAY, OVERDUE, FINAL_NOTICE
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("SCHEDULED") // SCHEDULED, SENT, FAILED, CANCELLED
+  channel      String    @default("EMAIL") // EMAIL, SMS, WHATSAPP
+  createdAt    DateTime  @default(now())
+
+  @@index([invoiceId, type])
+  @@index([status, scheduledFor])
+}
+
+// =========================================================================
+// MODULE 12 — CLIENT RETENTION, RENEWAL & REVENUE OPERATIONS ENGINE MODELS (7 MODELS)
+// =========================================================================
+
+model ClientHealthSnapshot {
+  id              String        @id @default(uuid())
+  clientId        String
+  client          DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  healthStatus    String        @default("HEALTHY") // HEALTHY, STABLE, AT_RISK, CRITICAL, CHURNED
+  healthScore     Int           @default(100) // 0 - 100
+  scoreFactors    String        // JSON string explaining factors
+  calculatedAt    DateTime      @default(now())
+  sourceVersion   String        @default("v1.0")
+
+  @@index([clientId, calculatedAt])
+  @@index([healthStatus])
+}
+
+model ClientRetentionCase {
+  id              String        @id @default(uuid())
+  clientId        String
+  client          DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  severity        String        @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  reason          String
+  detectedSignals String?       // JSON array/string of signals
+  assignedOwnerId String?
+  assignedOwner   User?         @relation("RetentionCaseOwner", fields: [assignedOwnerId], references: [id], onDelete: SetNull)
+  actionPlan      String?
+  dueDate         DateTime?
+  status          String        @default("OPEN") // OPEN, INVESTIGATING, ACTION_PLAN, MONITORING, RESOLVED, CHURNED
+  resolution      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([assignedOwnerId])
+}
+
+model ClientRenewal {
+  id                   String          @id @default(uuid())
+  clientId             String
+  client               DigitalClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contractId           String
+  contract             ClientContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  expirationWindowDays Int             @default(30) // 90, 60, 30, 14, 7
+  targetRenewalDate    DateTime
+  proposedValue        Decimal         @default(0) @db.Decimal(14, 2)
+  currency             String          @default("NGN")
+  assignedOwnerId      String?
+  assignedOwner        User?           @relation("RenewalOwner", fields: [assignedOwnerId], references: [id], onDelete: SetNull)
+  status               String          @default("UPCOMING") // UPCOMING, OUTREACH, NEGOTIATION, RENEWED, DECLINED, CHURNED
+  notes                String?
+  renewedContractId    String?         @unique
+  resolvedAt           DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([clientId])
+  @@index([contractId])
+  @@index([status, targetRenewalDate])
+}
+
+model ClientExpansionOpportunity {
+  id               String        @id @default(uuid())
+  clientId         String
+  client           DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  serviceCategory  String        // e.g. GOHIGHLEVEL, CRM, AUTOMATION, AI_AGENT, EMAIL, CONSULTING
+  title            String
+  description      String?
+  estimatedValue   Decimal       @default(0) @db.Decimal(14, 2)
+  currency         String        @default("NGN")
+  crmOpportunityId String?       // Link to Prompt 06 CrmOpportunity if converted
+  status           String        @default("IDENTIFIED") // IDENTIFIED, QUALIFIED, CONVERTED_TO_CRM, DISMISSED
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model ClientTouchpoint {
+  id            String        @id @default(uuid())
+  clientId      String
+  client        DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type          String        @default("CHECK_IN") // CALL, EMAIL, WHATSAPP, MEETING, CHECK_IN, RENEWAL_OUTREACH, SUPPORT_FOLLOWUP, DELIVERY_REVIEW, EXECUTIVE_REVIEW
+  summary       String
+  notes         String?
+  performedById String
+  performedBy   User          @relation("TouchpointPerformer", fields: [performedById], references: [id])
+  interactionId String?       // Optional link to Prompt 06 CrmInteraction
+  contactedAt   DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  @@index([clientId])
+  @@index([type])
+}
+
+model ClientRiskSignal {
+  id           String        @id @default(uuid())
+  clientId     String
+  client       DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  signalType   String        // e.g. INVOICE_OVERDUE, PROJECT_BLOCKED, CONTRACT_EXPIRING, LOW_TOUCHPOINTS
+  severity     String        @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  description  String
+  sourceDomain String        // BILLING, PROJECT, CRM, CONTRACT, ENGAGEMENT
+  detectedAt   DateTime      @default(now())
+  resolvedAt   DateTime?
+  status       String        @default("ACTIVE") // ACTIVE, RESOLVED, IGNORED
+
+  @@index([clientId, status])
+  @@index([signalType])
+}
+
+model ClientSuccessPlan {
+  id                String        @id @default(uuid())
+  clientId          String
+  client            DigitalClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title             String
+  clientObjectives  String
+  successMilestones String        // JSON array of milestones
+  expectedOutcomes  String?
+  reviewDate        DateTime?
+  ownerId           String?
+  owner             User?         @relation("SuccessPlanOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  status            String        @default("DRAFT") // DRAFT, ACTIVE, AT_RISK, COMPLETED, CANCELLED
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+// =========================================================================
+// MODULE 13 — WORKFLOW AUTOMATION & CROSS-DOMAIN ORCHESTRATION ENGINE MODELS (8 MODELS)
+// =========================================================================
+
+model AutomationWorkflow {
+  id           String              @id @default(uuid())
+  workflowCode String              @unique // e.g. WF-CRM-FOLLOWUP-001
+  name         String
+  description  String?
+  domain       String              @default("CROSS_DOMAIN") // CRM, PRODUCTIVITY, BILLING, RETENTION, PROJECT, CROSS_DOMAIN
+  triggerType  String              @default("EVENT") // EVENT, SCHEDULE, CONDITION, MANUAL
+  status       String              @default("DRAFT") // DRAFT, ACTIVE, PAUSED, ARCHIVED
+  isActive     Boolean             @default(true)
+  version      Int                 @default(1)
+  createdById  String
+  createdBy    User                @relation("WorkflowCreator", fields: [createdById], references: [id])
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  triggers     AutomationTrigger[]
+  steps        AutomationStep[]
+  executions   AutomationExecution[]
+  schedules    AutomationSchedule[]
+
+  @@index([domain])
+  @@index([isActive])
+  @@index([createdById])
+}
+
+model AutomationTrigger {
+  id                String             @id @default(uuid())
+  workflowId        String
+  workflow          AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  type              String             @default("EVENT") // EVENT, SCHEDULE, CONDITION, MANUAL
+  configurationJson String             // JSON string for event name, cron expression, condition criteria, etc.
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([workflowId])
+  @@index([type])
+}
+
+model AutomationStep {
+  id                String                    @id @default(uuid())
+  workflowId        String
+  workflow          AutomationWorkflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sequence          Int                       @default(1)
+  type              String                    // CONDITION, ACTION, DELAY, NOTIFICATION, TASK, CRM_ACTION, RETENTION_ACTION, WEBHOOK, EVENT
+  configurationJson String                    // JSON config for step parameters
+  isActive          Boolean                   @default(true)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  stepExecutions    AutomationStepExecution[]
+
+  @@index([workflowId, sequence])
+  @@index([type])
+}
+
+model AutomationExecution {
+  id              String                    @id @default(uuid())
+  workflowId      String
+  workflow        AutomationWorkflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion Int                       @default(1)
+  triggerType     String                    @default("EVENT") // EVENT, SCHEDULE, CONDITION, MANUAL
+  triggerEvent    String?                   // Event name or trigger description
+  status          String                    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, RETRYING, CANCELLED
+  startedAt       DateTime                  @default(now())
+  completedAt     DateTime?
+  error           String?
+  correlationId   String?
+  idempotencyKey  String                    @unique // e.g. LeadCreated:leadId:2026-08-15
+  retryCount      Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  stepExecutions  AutomationStepExecution[]
+  logs            AutomationExecutionLog[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AutomationStepExecution {
+  id           String              @id @default(uuid())
+  executionId  String
+  execution    AutomationExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  stepId       String
+  step         AutomationStep      @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  sequence     Int
+  status       String              @default("PENDING") // PENDING, RUNNING, COMPLETED, SKIPPED, FAILED, RETRYING
+  outputJson   String?
+  error        String?
+  startedAt    DateTime            @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  logs         AutomationExecutionLog[]
+
+  @@index([executionId])
+  @@index([stepId])
+  @@index([status])
+}
+
+model AutomationSchedule {
+  id             String             @id @default(uuid())
+  workflowId     String
+  workflow       AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  cronExpression String
+  timezone       String             @default("Africa/Lagos")
+  nextRunAt      DateTime
+  lastRunAt      DateTime?
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([workflowId])
+  @@index([isActive, nextRunAt])
+}
+
+model AutomationRule {
+  id            String   @id @default(uuid())
+  ruleCode      String   @unique // e.g. RULE-CLIENT-HEALTH-LOW
+  name          String
+  description   String?
+  conditionJson String   // JSON structure for condition evaluation
+  isActive      Boolean  @default(true)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model AutomationExecutionLog {
+  id              String                   @id @default(uuid())
+  executionId     String
+  execution       AutomationExecution      @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  stepExecutionId String?
+  stepExecution   AutomationStepExecution? @relation(fields: [stepExecutionId], references: [id], onDelete: SetNull)
+  eventType       String                   // e.g. INFO, WARN, ERROR, STEP_START, STEP_COMPLETE
+  message         String
+  metadataJson    String?                  // Sanitized metadata JSON
+  createdAt       DateTime                 @default(now())
+
+  @@index([executionId])
+  @@index([stepExecutionId])
+  @@index([createdAt])
+}
+
+// =========================================================================
+// MODULE 14 — UNIFIED NOTIFICATION, COMMUNICATIONS & MULTI-CHANNEL ENGINE (8 MODELS)
+// =========================================================================
+
+model NotificationTemplate {
+  id            String                @id @default(uuid())
+  templateCode  String                @unique // e.g. TMPL-INVOICE-OVERDUE-01
+  name          String
+  channel       String                @default("EMAIL") // EMAIL, SMS, WHATSAPP, IN_APP, WEBHOOK
+  subject       String?
+  bodyTemplate  String                // Template with placeholders {{memberName}}, {{invoiceNumber}}, etc.
+  variablesJson String                // JSON array of supported variable names
+  category      String                @default("SYSTEM") // SYSTEM, BILLING, RETENTION, MARKETING, SECURITY
+  isActive      Boolean               @default(true)
+  version       Int                   @default(1)
+  createdById   String
+  createdBy     User                  @relation("TemplateCreator", fields: [createdById], references: [id])
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  messages      NotificationMessage[]
+  campaigns     NotificationCampaign[]
+
+  @@index([channel])
+  @@index([category])
+  @@index([isActive])
+}
+
+model NotificationMessage {
+  id             String                 @id @default(uuid())
+  messageCode    String                 @unique // e.g. MSG-2026-10001
+  templateId     String?
+  template       NotificationTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  channel        String                 @default("EMAIL") // EMAIL, SMS, WHATSAPP, IN_APP, WEBHOOK
+  recipientId    String?
+  recipient      User?                  @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+  recipientEmail String?
+  recipientPhone String?
+  subject        String?
+  bodyContent    String
+  metadataJson   String?                // Sanitized payload metadata
+  status         String                 @default("PENDING") // PENDING, QUEUED, SENT, DELIVERED, READ, FAILED, CANCELLED
+  scheduledAt    DateTime               @default(now())
+  sentAt         DateTime?
+  idempotencyKey String                 @unique // e.g. InvoiceOverdue:inv_123:2026-08-15
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  deliveries     NotificationDelivery[]
+  logs           NotificationLog[]
+
+  @@index([recipientId])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model NotificationDelivery {
+  id                String              @id @default(uuid())
+  messageId         String
+  message           NotificationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  provider          String              @default("IN_APP") // SMTP, SENDGRID, TWILIO, WHATSAPP_CLOUD, IN_APP, WEBHOOK_HTTP
+  providerMessageId String?
+  status            String              @default("PENDING") // PENDING, SUCCESS, FAILED, RETRYING
+  attemptCount      Int                 @default(1)
+  errorTrace        String?
+  deliveredAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  logs              NotificationLog[]
+
+  @@index([messageId])
+  @@index([provider])
+  @@index([status])
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled    Boolean  @default(true)
+  smsEnabled      Boolean  @default(true)
+  whatsappEnabled Boolean  @default(true)
+  inAppEnabled    Boolean  @default(true)
+  marketingOptIn  Boolean  @default(true)
+  billingOptIn    Boolean  @default(true)
+  retentionOptIn  Boolean  @default(true)
+  systemOptIn     Boolean  @default(true)
+  quietHoursStart String?  // e.g. '22:00'
+  quietHoursEnd   String?  // e.g. '08:00'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model NotificationCampaign {
+  id            String                @id @default(uuid())
+  campaignCode  String                @unique // e.g. CMP-2026-OUTREACH-01
+  name          String
+  description   String?
+  templateId    String
+  template      NotificationTemplate  @relation(fields: [templateId], references: [id])
+  status        String                @default("DRAFT") // DRAFT, SCHEDULED, SENDING, COMPLETED, PAUSED, CANCELLED
+  targetSegment String                // e.g. ALL_MEMBERS, AT_RISK_CLIENTS, VIP_CLIENTS
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  createdById   String
+  createdBy     User                  @relation("CampaignCreator", fields: [createdById], references: [id])
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model NotificationRecipientGroup {
+  id            String   @id @default(uuid())
+  groupCode     String   @unique // e.g. GRP-VIP-CLIENTS
+  name          String
+  description   String?
+  criteriaJson  String   // JSON condition criteria
+  memberIdsJson String   // JSON array of user IDs
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([groupCode])
+}
+
+model NotificationSuppression {
+  id           String   @id @default(uuid())
+  emailOrPhone String   @unique // Target email or phone number
+  reason       String   // BOUNCE, SPAM_COMPLAINT, UNSUBSCRIBE, MANUAL_BLOCK
+  channel      String   @default("EMAIL")
+  suppressedAt DateTime @default(now())
+
+  @@index([emailOrPhone])
+  @@index([reason])
+}
+
+model NotificationLog {
+  id           String                @id @default(uuid())
+  messageId    String
+  message      NotificationMessage   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  deliveryId   String?
+  delivery     NotificationDelivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  eventType    String                // INFO, WARN, ERROR, SENT, DELIVERED, BOUNCED, SUPPRESSED
+  logMessage   String
+  metadataJson String?               // Sanitized log metadata
+  createdAt    DateTime              @default(now())
+
+  @@index([messageId])
+  @@index([deliveryId])
+  @@index([createdAt])
+}
+
+// =========================================================================
+// MODULE 15 — AI LEADERSHIP ASSISTANT & EXECUTIVE CO-PILOT (8 MODELS)
+// =========================================================================
+
+model AiConversation {
+  id               String      @id @default(uuid())
+  conversationCode String      @unique // e.g. CONV-2026-10001
+  title            String
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contextDomain    String      @default("GENERAL") // GENERAL, ORGANIZATION, FINANCIAL, CRM, PROJECTS, RETENTION, PRODUCTIVITY
+  status           String      @default("ACTIVE") // ACTIVE, ARCHIVED
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  messages         AiMessage[]
+  auditLogs        AiAuditLog[]
+
+  @@index([userId])
+  @@index([contextDomain])
+  @@index([status])
+}
+
+model AiMessage {
+  id             String         @id @default(uuid())
+  messageCode    String         @unique // e.g. AIM-2026-10001
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String         @default("USER") // USER, ASSISTANT, SYSTEM, TOOL
+  content        String
+  tokensUsed     Int            @default(0)
+  modelName      String         @default("gemini-2.5-flash")
+  citationsJson  String?        // JSON array of domain citation links
+  metadataJson   String?        // Sanitized metadata
+  createdAt      DateTime       @default(now())
+
+  auditLogs      AiAuditLog[]
+
+  @@index([conversationId])
+  @@index([role])
+  @@index([createdAt])
+}
+
+model AiInsight {
+  id                       String   @id @default(uuid())
+  insightCode              String   @unique // e.g. INS-2026-10001
+  userId                   String
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain                   String   @default("ORGANIZATION") // ORGANIZATION, RETENTION, FINANCIAL, PRODUCTIVITY, PROJECTS
+  title                    String
+  summary                  String
+  actionableRecommendation String
+  severity                 String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status                   String   @default("NEW") // NEW, REVIEWED, ACTIONED, DISMISSED
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([userId])
+  @@index([domain])
+  @@index([severity])
+  @@index([status])
+}
+
+model AiCoachingPrompt {
+  id             String   @id @default(uuid())
+  promptCode     String   @unique // e.g. PRM-LEADERSHIP-01
+  category       String   @default("LEADERSHIP") // LEADERSHIP, RECRUITING, RETENTION, FINANCIAL_DISCIPLINE, PRODUCTIVITY
+  title          String
+  promptTemplate String
+  variablesJson  String   // JSON array of placeholder variable names
+  isActive       Boolean  @default(true)
+  createdById    String
+  createdBy      User     @relation("PromptCreator", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model AiRecommendation {
+  id                 String   @id @default(uuid())
+  recommendationCode String   @unique // e.g. REC-2026-10001
+  targetEntityId     String
+  targetEntityType   String   // MEMBER, CLIENT, PROJECT, LEAD, CAMPAIGN
+  title              String
+  recommendationText String
+  confidenceScore    Float    @default(0.95)
+  status             String   @default("PENDING") // PENDING, APPLIED, REJECTED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([targetEntityId])
+  @@index([targetEntityType])
+  @@index([status])
+}
+
+model AiKnowledgeIndex {
+  id                  String   @id @default(uuid())
+  indexCode           String   @unique // e.g. KNW-2026-10001
+  domain              String   @default("ORGANIZATION")
+  documentTitle       String
+  contentChunk        String
+  vectorEmbeddingJson String?  // JSON array of embedding vector numbers
+  sourceEntityId      String?
+  sourceEntityType    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([sourceEntityId])
+}
+
+model AiUsageQuota {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyPromptLimit    Int      @default(100)
+  promptsUsedToday    Int      @default(0)
+  lastResetDate       DateTime @default(now())
+  totalTokensConsumed Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model AiAuditLog {
+  id                  String          @id @default(uuid())
+  conversationId      String?
+  conversation        AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  messageId           String?
+  message             AiMessage?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  action              String          // PROMPT_SUBMITTED, RESPONSE_GENERATED, INSIGHT_TRIGGERED, RECOMMENDATION_APPLIED
+  modelName           String          @default("gemini-2.5-flash")
+  tokensUsed          Int             @default(0)
+  costEstimateDecimal Decimal         @default(0) @db.Decimal(10, 6)
+  metadataJson        String?
+  createdAt           DateTime        @default(now())
+
+  @@index([conversationId])
+  @@index([messageId])
+  @@index([createdAt])
+}
+
+// =========================================================================
+// MODULE 17 — UNIFIED EXECUTIVE COMMAND CENTER, GLOBAL SEARCH & SYSTEM OPS (4 MODELS)
+// =========================================================================
+
+model UnifiedSavedView {
+  id                String   @id @default(uuid())
+  userId            String
+  name              String
+  description       String?
+  configurationJson String
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model CommandShortcut {
+  id                String   @id @default(uuid())
+  userId            String
+  code              String
+  label             String
+  configurationJson String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId, code])
+}
+
+model DashboardLayout {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  layoutJson String
+  version    Int      @default(1)
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SystemHealthSnapshot {
+  id                   String   @id @default(uuid())
+  calculatedAt         DateTime @default(now())
+  overallStatus        String   @default("HEALTHY") // HEALTHY, DEGRADED, ERROR, UNKNOWN
+  componentResultsJson String
+  durationMs           Int
+  sourceVersion        String   @default("1.0.0")
+
+  @@index([calculatedAt])
+}
+
+// =========================================================================
+// MODULE 18 — PLATFORM SECURITY, GOVERNANCE, OBSERVABILITY & COMPLIANCE ENGINE (10 MODELS)
+// =========================================================================
+
+model PlatformSecurityEvent {
+  id           String   @id @default(uuid())
+  eventCode    String   @unique
+  eventType    String
+  severity     String
+  source       String
+  actorId      String?
+  ipAddress    String?
+  userAgent    String?
+  resourceType String?
+  resourceId   String?
+  action       String
+  result       String
+  metadataJson String?
+  correlationId String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([severity])
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([correlationId])
+}
+
+model SecurityIncident {
+  id             String    @id @default(uuid())
+  incidentCode   String    @unique
+  title          String
+  description    String
+  severity       String
+  status         String    @default("OPEN") // OPEN, ACKNOWLEDGED, INVESTIGATING, CONTAINED, RESOLVED, CLOSED
+  category       String
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  assignedToId   String?
+  rootCause      String?
+  resolution     String?
+  metadataJson   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([severity])
+  @@index([detectedAt])
+  @@index([assignedToId])
+}
+
+model AccessReview {
+  id             String             @id @default(uuid())
+  reviewCode     String             @unique
+  userId         String
+  reviewerId     String
+  status         String             @default("PENDING") // PENDING, IN_REVIEW, APPROVED, REVOKED, EXPIRED
+  startedAt      DateTime           @default(now())
+  completedAt    DateTime?
+  notes          String?
+  metadataJson   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  items          AccessReviewItem[]
+
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([status])
+}
+
+model AccessReviewItem {
+  id                String       @id @default(uuid())
+  reviewId          String
+  review            AccessReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  permission        String
+  source            String
+  currentState      String
+  recommendedAction String
+  reviewedAction    String?
+  reviewerNotes     String?
+  createdAt         DateTime     @default(now())
+
+  @@index([reviewId])
+  @@index([permission])
+}
+
+model ComplianceControl {
+  id               String               @id @default(uuid())
+  controlCode      String               @unique
+  name             String
+  description      String
+  category         String
+  framework        String               // SOC2, ISO27001, GDPR, INTERNAL
+  ownerRole        String
+  status           String               @default("ACTIVE") // ACTIVE, INACTIVE, AT_RISK
+  frequency        String
+  evidenceRequired Boolean              @default(true)
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  evidences        ComplianceEvidence[]
+
+  @@index([framework])
+  @@index([status])
+  @@index([controlCode])
+}
+
+model ComplianceEvidence {
+  id            String            @id @default(uuid())
+  controlId     String
+  control       ComplianceControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  evidenceType  String
+  reference     String
+  description   String?
+  collectedAt   DateTime          @default(now())
+  collectedById String?
+  expiresAt     DateTime?
+  metadataJson  String?
+
+  @@index([controlId])
+  @@index([collectedAt])
+  @@index([expiresAt])
+}
+
+model SecurityRisk {
+  id             String    @id @default(uuid())
+  riskCode       String    @unique
+  title          String
+  description    String
+  category       String
+  severity       String
+  likelihood     Int
+  impact         Int
+  riskScore      Int
+  status         String    @default("OPEN") // OPEN, MITIGATING, ACCEPTED, RESOLVED, CLOSED
+  ownerId        String?
+  mitigationPlan String?
+  detectedAt     DateTime  @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([severity])
+  @@index([riskScore])
+  @@index([riskCode])
+}
+
+model OperationalIncident {
+  id           String    @id @default(uuid())
+  incidentCode String    @unique
+  service      String
+  severity     String
+  status       String    @default("OPEN") // OPEN, INVESTIGATING, MITIGATED, RESOLVED, CLOSED
+  summary      String
+  detectedAt   DateTime  @default(now())
+  startedAt    DateTime?
+  resolvedAt   DateTime?
+  rootCause    String?
+  impact       String?
+  metadataJson String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([service])
+  @@index([status])
+  @@index([detectedAt])
+}
+
+model SystemMetric {
+  id           String   @id @default(uuid())
+  metricCode   String
+  service      String
+  metricType   String
+  value        Float
+  unit         String
+  recordedAt   DateTime @default(now())
+  metadataJson String?
+
+  @@index([service])
+  @@index([metricType])
+  @@index([recordedAt])
+}
+
+model RateLimitEvent {
+  id          String   @id @default(uuid())
+  key         String
+  scope       String
+  endpoint    String?
+  actorId     String?
+  count       Int
+  limit       Int
+  windowStart DateTime
+  windowEnd   DateTime
+  blocked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([key])
+  @@index([scope])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([blocked])
+}
+
+// =========================================================================
+// MODULE 19: SECURE INTEGRATION, API GATEWAY & CONNECTIVITY ENGINE MODELS
+// =========================================================================
+
+model Integration {
+  id               String   @id @default(uuid())
+  integrationCode  String   @unique
+  name             String
+  description      String?
+  provider         String
+  category         String   // CRM, ACCOUNTING, PAYMENTS, COMMUNICATION, MARKETING, PROJECT_MANAGEMENT, ANALYTICS, AI, STORAGE, IDENTITY, CUSTOM
+  status           String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, DISABLED, ERROR
+  version          String?
+  documentationUrl String?
+  isActive         Boolean  @default(true)
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  connections IntegrationConnection[]
+  endpoints   IntegrationEndpoint[]
+  webhooks    IntegrationWebhook[]
+  events      IntegrationEvent[]
+  jobs        IntegrationJob[]
+  mappings    IntegrationMapping[]
+  logs        IntegrationLog[]
+  healths     IntegrationHealth[]
+
+  @@index([provider])
+  @@index([category])
+  @@index([status])
+  @@index([isActive])
+}
+
+model IntegrationConnection {
+  id                  String    @id @default(uuid())
+  integrationId       String
+  connectionCode      String    @unique
+  name                String
+  environment         String    @default("PRODUCTION") // DEVELOPMENT, STAGING, PRODUCTION
+  status              String    @default("ACTIVE") // DRAFT, ACTIVE, PAUSED, DISABLED, ERROR
+  authType            String    // API_KEY, OAUTH2, BEARER, BASIC, HMAC, CUSTOM
+  credentialReference String    // MUST NOT CONTAIN RAW CREDENTIALS
+  configurationJson   String?
+  lastTestedAt        DateTime?
+  lastSuccessfulAt    DateTime?
+  lastFailureAt       DateTime?
+  failureReason       String?
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  integration Integration        @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  events      IntegrationEvent[]
+  jobs        IntegrationJob[]
+  logs        IntegrationLog[]
+  healths     IntegrationHealth[]
+
+  @@index([integrationId])
+  @@index([environment])
+  @@index([status])
+  @@index([authType])
+}
+
+model IntegrationEndpoint {
+  id              String   @id @default(uuid())
+  integrationId   String
+  name            String
+  method          String   // GET, POST, PUT, PATCH, DELETE
+  path            String
+  purpose         String
+  direction       String   // INBOUND, OUTBOUND
+  isActive        Boolean  @default(true)
+  timeoutMs       Int      @default(30000)
+  retryPolicyJson String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([direction])
+  @@index([isActive])
+}
+
+model IntegrationWebhook {
+  id                 String    @id @default(uuid())
+  integrationId      String
+  webhookCode        String    @unique
+  name               String
+  endpointPath       String
+  secretReference    String    // NEVER STORE RAW WEBHOOK SECRETS
+  signatureAlgorithm String    @default("HMAC_SHA256")
+  eventType          String
+  isActive           Boolean   @default(true)
+  lastReceivedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([webhookCode])
+  @@index([eventType])
+  @@index([isActive])
+}
+
+model IntegrationEvent {
+  id              String    @id @default(uuid())
+  eventCode       String    @unique
+  integrationId   String?
+  connectionId    String?
+  direction       String    // INBOUND, OUTBOUND
+  eventType       String
+  externalEventId String?
+  idempotencyKey  String    @unique
+  payloadHash     String
+  status          String    @default("RECEIVED") // RECEIVED, PROCESSING, PROCESSED, FAILED, IGNORED, RETRYING, DEAD_LETTER
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+  error           String?
+  correlationId   String?
+  metadataJson    String?
+
+  integration Integration?           @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  connection  IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  logs        IntegrationLog[]
+
+  @@index([integrationId])
+  @@index([connectionId])
+  @@index([direction])
+  @@index([eventType])
+  @@index([status])
+  @@index([externalEventId])
+  @@index([correlationId])
+}
+
+model IntegrationJob {
+  id            String    @id @default(uuid())
+  jobCode       String    @unique
+  integrationId String
+  connectionId  String?
+  jobType       String
+  status        String    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, RETRYING, CANCELLED, DEAD_LETTER
+  scheduledAt   DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  attemptCount  Int       @default(0)
+  maxAttempts   Int       @default(5)
+  nextRetryAt   DateTime?
+  error         String?
+  metadataJson  String?
+
+  integration Integration            @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  connection  IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  logs        IntegrationLog[]
+
+  @@index([integrationId])
+  @@index([connectionId])
+  @@index([jobType])
+  @@index([status])
+  @@index([nextRetryAt])
+}
+
+model IntegrationMapping {
+  id                 String   @id @default(uuid())
+  mappingCode        String   @unique
+  integrationId      String
+  sourceSystem       String
+  targetSystem       String
+  sourceEntity       String
+  targetEntity       String
+  mappingJson        String
+  transformerVersion String?
+  isActive           Boolean  @default(true)
+  createdById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([sourceSystem, targetSystem])
+  @@index([sourceEntity, targetEntity])
+  @@index([isActive])
+}
+
+model IntegrationLog {
+  id            String   @id @default(uuid())
+  integrationId String?
+  connectionId  String?
+  eventId       String?
+  jobId         String?
+  level         String   // DEBUG, INFO, WARN, ERROR
+  eventType     String
+  message       String
+  statusCode    Int?
+  durationMs    Int?
+  metadataJson  String?
+  createdAt     DateTime @default(now())
+
+  integration Integration?           @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  connection  IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  event       IntegrationEvent?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  job         IntegrationJob?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([integrationId])
+  @@index([connectionId])
+  @@index([eventId])
+  @@index([jobId])
+  @@index([level])
+  @@index([createdAt])
+}
+
+model IntegrationHealth {
+  id               String    @id @default(uuid())
+  integrationId    String
+  connectionId     String?
+  status           String    @default("UNKNOWN") // HEALTHY, DEGRADED, UNAVAILABLE, UNKNOWN
+  latencyMs        Float?
+  successRate      Float?
+  errorRate        Float?
+  lastCheckedAt    DateTime  @default(now())
+  lastSuccessfulAt DateTime?
+  lastFailureAt    DateTime?
+  detailsJson      String?
+
+  integration Integration            @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  connection  IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([integrationId])
+  @@index([connectionId])
+  @@index([status])
+  @@index([lastCheckedAt])
+}
+
+// ============================================================
+// Module 20 — Platform Resilience, Backup, DR & Business Continuity
+// ============================================================
+
+model ResiliencePolicy {
+  id           String   @id @default(uuid())
+  policyCode   String   @unique
+  name         String
+  description  String?
+  scope        String   // PLATFORM, SERVICE, DATA, INFRASTRUCTURE
+  rpoMinutes   Int
+  rtoMinutes   Int
+  priority     Int      @default(0)
+  criticality  String   // CRITICAL, HIGH, MEDIUM, LOW
+  isActive     Boolean  @default(true)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy User? @relation("ResiliencePolicyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([criticality])
+  @@index([scope])
+}
+
+model BackupPlan {
+  id                    String    @id @default(uuid())
+  planCode              String    @unique
+  name                  String
+  description           String?
+  backupType            String    // FULL, INCREMENTAL, DIFFERENTIAL, SNAPSHOT, CONFIGURATION, DOCUMENT
+  frequency             String    // HOURLY, DAILY, WEEKLY, MONTHLY, ON_DEMAND
+  retentionDays         Int       @default(30)
+  storageReference      String?
+  encryptionRequired    Boolean   @default(true)
+  verificationRequired  Boolean   @default(true)
+  isActive              Boolean   @default(true)
+  lastSuccessfulBackupAt DateTime?
+  lastFailedBackupAt     DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  executions BackupExecution[]
+
+  @@index([isActive])
+  @@index([backupType])
+}
+
+model BackupExecution {
+  id                 String    @id @default(uuid())
+  executionCode      String    @unique
+  backupPlanId       String
+  status             String    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, CANCELLED
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  sizeBytes          BigInt?
+  checksum           String?
+  storageReference   String?
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED, FAILED, NOT_REQUIRED
+  errorMessage       String?
+  correlationId      String?
+  metadataJson       String?
+  createdAt          DateTime  @default(now())
+
+  backupPlan BackupPlan @relation(fields: [backupPlanId], references: [id], onDelete: Cascade)
+
+  @@index([backupPlanId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([correlationId])
+}
+
+model RecoveryPlan {
+  id                    String    @id @default(uuid())
+  planCode              String    @unique
+  name                  String
+  description           String?
+  scope                 String    // PLATFORM, SERVICE, DATA, INFRASTRUCTURE
+  priority              Int       @default(0)
+  targetRpoMinutes      Int
+  targetRtoMinutes      Int
+  status                String    @default("DRAFT") // DRAFT, ACTIVE, PAUSED, RETIRED
+  lastTestedAt          DateTime?
+  lastSuccessfulTestAt  DateTime?
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  createdBy  User?             @relation("RecoveryPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  steps      RecoveryStep[]
+  executions RecoveryExecution[]
+
+  @@index([status])
+  @@index([priority])
+}
+
+model RecoveryStep {
+  id                String   @id @default(uuid())
+  recoveryPlanId    String
+  stepNumber        Int
+  name              String
+  description       String?
+  stepType          String   // VALIDATION, BACKUP, RESTORE, CONFIGURATION, SERVICE_START, SERVICE_STOP, HEALTH_CHECK, DATA_VERIFICATION, NOTIFICATION, MANUAL_APPROVAL
+  commandReference  String?
+  dependencyJson    String?
+  timeoutSeconds    Int      @default(300)
+  isRequired        Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  recoveryPlan   RecoveryPlan            @relation(fields: [recoveryPlanId], references: [id], onDelete: Cascade)
+  stepExecutions RecoveryStepExecution[]
+
+  @@unique([recoveryPlanId, stepNumber])
+  @@index([recoveryPlanId])
+}
+
+model RecoveryExecution {
+  id               String    @id @default(uuid())
+  executionCode    String    @unique
+  recoveryPlanId   String
+  status           String    @default("PENDING") // PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED, ROLLBACK_REQUIRED
+  triggerType      String    // MANUAL, SCHEDULED, INCIDENT, DRILL, AUTOMATED
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  initiatedById    String?
+  currentStep      Int?
+  errorMessage     String?
+  correlationId    String?
+  metadataJson     String?
+  createdAt        DateTime  @default(now())
+
+  recoveryPlan   RecoveryPlan            @relation(fields: [recoveryPlanId], references: [id], onDelete: Cascade)
+  initiatedBy    User?                   @relation("RecoveryInitiator", fields: [initiatedById], references: [id], onDelete: SetNull)
+  stepExecutions RecoveryStepExecution[]
+
+  @@index([recoveryPlanId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([correlationId])
+}
+
+model RecoveryStepExecution {
+  id                  String    @id @default(uuid())
+  recoveryExecutionId String
+  recoveryStepId      String
+  status              String    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, RETRYING
+  startedAt           DateTime?
+  completedAt         DateTime?
+  outputSummary       String?
+  errorMessage        String?
+  attemptCount        Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  recoveryExecution RecoveryExecution @relation(fields: [recoveryExecutionId], references: [id], onDelete: Cascade)
+  recoveryStep      RecoveryStep      @relation(fields: [recoveryStepId], references: [id], onDelete: Cascade)
+
+  @@unique([recoveryExecutionId, recoveryStepId])
+  @@index([recoveryExecutionId])
+  @@index([recoveryStepId])
+  @@index([status])
+}
+
+model ResilienceDependency {
+  id                   String   @id @default(uuid())
+  dependencyCode       String   @unique
+  name                 String
+  serviceName          String
+  dependencyType       String   // DATABASE, CACHE, STORAGE, EXTERNAL_API, INTEGRATION, MESSAGING, AUTHENTICATION, INTERNAL_SERVICE, THIRD_PARTY
+  criticality          String   // CRITICAL, HIGH, MEDIUM, LOW
+  healthCheckReference String?
+  fallbackStrategy     String?
+  rpoMinutes           Int?
+  rtoMinutes           Int?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([dependencyType])
+  @@index([criticality])
+  @@index([isActive])
+}
+
+model ContinuityPlan {
+  id                              String    @id @default(uuid())
+  planCode                        String    @unique
+  name                            String
+  description                     String?
+  businessFunction                String
+  criticality                     String    // CRITICAL, HIGH, MEDIUM, LOW
+  minimumOperatingLevel           String?
+  maximumTolerableDowntimeMinutes Int
+  status                          String    @default("DRAFT") // DRAFT, ACTIVE, UNDER_REVIEW, RETIRED
+  ownerId                         String?
+  lastReviewedAt                  DateTime?
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  owner      User?                @relation("ContinuityPlanOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  procedures ContinuityProcedure[]
+
+  @@index([status])
+  @@index([criticality])
+  @@index([businessFunction])
+}
+
+model ContinuityProcedure {
+  id               String   @id @default(uuid())
+  continuityPlanId String
+  procedureCode    String   @unique
+  name             String
+  sequence         Int
+  description      String?
+  responsibleRole  String?
+  dependencyJson   String?
+  fallbackAction   String?
+  isRequired       Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  continuityPlan ContinuityPlan @relation(fields: [continuityPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([continuityPlanId, sequence])
+  @@index([continuityPlanId])
+}
+
+model ResilienceIncident {
+  id                  String    @id @default(uuid())
+  incidentCode        String    @unique
+  name                String
+  description         String?
+  severity            String    // CRITICAL, HIGH, MEDIUM, LOW
+  status              String    @default("OPEN") // OPEN, ACKNOWLEDGED, ASSESSING, RECOVERING, MONITORING, RESOLVED, CLOSED
+  source              String    // MONITORING, BACKUP, RECOVERY, INTEGRATION, SECURITY, DATABASE, INFRASTRUCTURE, MANUAL
+  detectedAt          DateTime  @default(now())
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  recoveryExecutionId String?
+  rootCause           String?
+  impactSummary       String?
+  correlationId       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([severity])
+  @@index([source])
+  @@index([detectedAt])
+  @@index([correlationId])
+}
+
+model RecoveryAuditLog {
+  id                  String   @id @default(uuid())
+  eventCode           String   @unique
+  recoveryPlanId      String?
+  backupExecutionId   String?
+  recoveryExecutionId String?
+  incidentId          String?
+  eventType           String
+  message             String
+  metadataJson        String?
+  correlationId       String?
+  createdAt           DateTime @default(now())
+
+  @@index([eventType])
+  @@index([recoveryPlanId])
+  @@index([backupExecutionId])
+  @@index([recoveryExecutionId])
+  @@index([incidentId])
+  @@index([correlationId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// MODULE 21: ENTERPRISE DOCUMENT, KNOWLEDGE & RECORDS MANAGEMENT ENGINE
+// ============================================================================
+
+model DocumentFolder {
+  id            String           @id @default(uuid())
+  folderCode    String           @unique
+  name          String
+  description   String?
+  parentFolderId String?
+  parentFolder  DocumentFolder?  @relation("FolderHierarchy", fields: [parentFolderId], references: [id], onDelete: SetNull)
+  subFolders    DocumentFolder[] @relation("FolderHierarchy")
+  ownerId       String?
+  owner         User?            @relation("FolderOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  visibility    String           @default("ORGANIZATION")
+  isSystem      Boolean          @default(false)
+  documents     Document[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([parentFolderId])
+  @@index([ownerId])
+  @@index([visibility])
+}
+
+model Document {
+  id               String                 @id @default(uuid())
+  documentCode     String                 @unique
+  title            String
+  description      String?
+  documentType     String                 @default("GENERAL")
+  status           String                 @default("ACTIVE")
+  folderId         String?
+  folder           DocumentFolder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  ownerId          String?
+  owner            User?                  @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organizationId   String?
+  currentVersionId String?
+  classification   String                 @default("INTERNAL")
+  visibility       String                 @default("ORGANIZATION")
+  mimeType         String?
+  fileSizeBytes    Int?
+  storageReference String
+  checksum         String?
+  isArchived       Boolean                @default(false)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  versions         DocumentVersion[]
+  metadata         DocumentMetadata?
+  tags             DocumentTagAssignment[]
+  permissions      DocumentPermission[]
+  shares           DocumentShare[]
+  approvals        DocumentApproval[]
+  relations        DocumentRelation[]
+  activityLogs     DocumentActivityLog[]
+  legalHolds       RecordLegalHold[]
+  knowledgeEntries KnowledgeEntry[]
+
+  @@index([documentType])
+  @@index([status])
+  @@index([classification])
+  @@index([folderId])
+  @@index([ownerId])
+  @@index([visibility])
+  @@index([isArchived])
+  @@index([currentVersionId])
+}
+
+model DocumentVersion {
+  id               String                @id @default(uuid())
+  versionCode      String                @unique
+  documentId       String
+  document         Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber    Int
+  storageReference String
+  checksum         String?
+  mimeType         String?
+  fileSizeBytes    Int?
+  changeSummary    String?
+  createdById      String?
+  createdBy        User?                 @relation("VersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime              @default(now())
+
+  approvals        DocumentApproval[]
+  activityLogs     DocumentActivityLog[]
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@index([createdById])
+}
+
+model DocumentMetadata {
+  id             String    @id @default(uuid())
+  documentId     String    @unique
+  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  metadataJson   String    @default("{}")
+  tagsJson       String?
+  language       String?
+  author         String?
+  source         String?
+  effectiveDate  DateTime?
+  expirationDate DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model DocumentTag {
+  id          String                  @id @default(uuid())
+  tagCode     String                  @unique
+  name        String
+  description String?
+  assignments DocumentTagAssignment[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+model DocumentTagAssignment {
+  id         String      @id @default(uuid())
+  documentId String
+  document   Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        DocumentTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([documentId, tagId])
+  @@index([documentId])
+  @@index([tagId])
+}
+
+model DocumentPermission {
+  id          String    @id @default(uuid())
+  documentId  String
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subjectType String
+  permission  String
+  grantedById String?
+  grantedBy   User?     @relation("PermissionGranter", fields: [grantedById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([documentId])
+  @@index([subjectId])
+  @@index([subjectType])
+  @@index([permission])
+}
+
+model DocumentShare {
+  id            String    @id @default(uuid())
+  shareCode     String    @unique
+  documentId    String
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sharedWithId  String?
+  sharedWithType String   @default("USER")
+  permission    String    @default("VIEW")
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdById   String?
+  createdBy     User?     @relation("ShareCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+
+  @@index([documentId])
+  @@index([sharedWithId])
+  @@index([shareCode])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model DocumentApproval {
+  id            String          @id @default(uuid())
+  approvalCode  String          @unique
+  documentId    String
+  document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId     String
+  version       DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  status        String          @default("PENDING")
+  requestedById String?
+  requestedBy   User?           @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewerId    String?
+  reviewer      User?           @relation("ApprovalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  requestedAt   DateTime        @default(now())
+  reviewedAt    DateTime?
+  comments      String?
+
+  @@index([documentId])
+  @@index([versionId])
+  @@index([status])
+  @@index([reviewerId])
+  @@index([requestedById])
+}
+
+model KnowledgeCollection {
+  id             String           @id @default(uuid())
+  collectionCode String           @unique
+  name           String
+  description    String?
+  visibility     String           @default("ORGANIZATION")
+  ownerId        String?
+  owner          User?            @relation("CollectionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  isActive       Boolean          @default(true)
+  entries        KnowledgeEntry[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([ownerId])
+  @@index([visibility])
+  @@index([isActive])
+}
+
+model KnowledgeEntry {
+  id               String              @id @default(uuid())
+  entryCode        String              @unique
+  collectionId     String
+  collection       KnowledgeCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  title            String
+  content          String
+  status           String              @default("DRAFT")
+  sourceDocumentId String?
+  sourceDocument   Document?           @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  version          Int?                @default(1)
+  authorId         String?
+  author           User?               @relation("KnowledgeAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  approvedById     String?
+  approvedBy       User?               @relation("KnowledgeApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  publishedAt      DateTime?
+  chunks           KnowledgeChunk[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([collectionId])
+  @@index([status])
+  @@index([authorId])
+  @@index([publishedAt])
+}
+
+model KnowledgeChunk {
+  id               String         @id @default(uuid())
+  entryCode        String
+  knowledgeEntryId String
+  knowledgeEntry   KnowledgeEntry @relation(fields: [knowledgeEntryId], references: [id], onDelete: Cascade)
+  chunkIndex       Int
+  content          String
+  tokenCount       Int?
+  checksum         String?
+  metadataJson     String?
+  createdAt        DateTime       @default(now())
+
+  @@unique([knowledgeEntryId, chunkIndex])
+  @@index([knowledgeEntryId])
+  @@index([entryCode])
+}
+
+model DocumentRelation {
+  id                String   @id @default(uuid())
+  relationCode      String   @unique
+  documentId        String
+  document          Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  relatedEntityType String
+  relatedEntityId   String
+  relationType      String   @default("ATTACHMENT")
+  createdById       String?
+  createdBy         User?    @relation("RelationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+
+  @@index([documentId])
+  @@index([relatedEntityType, relatedEntityId])
+  @@index([relationType])
+}
+
+model DocumentActivityLog {
+  id            String           @id @default(uuid())
+  activityCode  String           @unique
+  documentId    String?
+  document      Document?        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId     String?
+  version       DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  activityType  String
+  actorId       String?
+  actor         User?            @relation("DocumentActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  message       String
+  metadataJson  String?
+  correlationId String?
+  createdAt     DateTime         @default(now())
+
+  @@index([documentId])
+  @@index([activityType])
+  @@index([actorId])
+  @@index([correlationId])
+  @@index([createdAt])
+}
+
+model RecordRetentionPolicy {
+  id                 String   @id @default(uuid())
+  policyCode         String   @unique
+  name               String
+  description        String?
+  documentType       String
+  retentionDays      Int
+  legalHoldSupported Boolean  @default(true)
+  autoArchive        Boolean  @default(false)
+  autoDelete         Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([documentType])
+  @@index([isActive])
+}
+
+model RecordLegalHold {
+  id           String    @id @default(uuid())
+  holdCode     String    @unique
+  documentId   String
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reason       String
+  placedById   String?
+  placedBy     User?     @relation("LegalHoldPlacer", fields: [placedById], references: [id], onDelete: SetNull)
+  releasedById String?
+  releasedBy   User?     @relation("LegalHoldReleaser", fields: [releasedById], references: [id], onDelete: SetNull)
+  placedAt     DateTime  @default(now())
+  releasedAt   DateTime?
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([documentId])
+  @@index([status])
+  @@index([placedAt])
+}
+
+
+
+
+
+
+
+

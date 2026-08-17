@@ -1,0 +1,44 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Next.js build output
+/.next/
+/out/
+
+# Production builds
+/build
+/dist
+
+# Local environment & secrets
+.env
+.env*.local
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Database data & SQLite
+.pgdata/
+*.sqlite
+*.sqlite3
+*.db
+
+# Document local storage & cache
+.storage/
+storage/documents/*
+!storage/documents/.gitkeep
+
+# IDE & OS files
+.DS_Store
+*.pem
+Thumbs.db
+.vscode/
+.idea/
+
+# Testing & Coverage
+/coverage
+/cypress/videos
+/cypress/screenshots
