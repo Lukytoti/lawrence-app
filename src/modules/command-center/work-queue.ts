@@ -6,30 +6,36 @@ export async function getPersonalWorkQueue(actorUserId: string): Promise<WorkQue
   const now = new Date();
 
   // 1. Overdue & Due Today Tasks
-  const tasks = await db.task.findMany({
-    where: {
-      assigneeId: actorUserId,
-      status: { not: 'COMPLETED' },
-    },
-    take: 15,
-    orderBy: { dueDate: 'asc' },
+  const member = await db.networkMember.findUnique({
+    where: { userId: actorUserId },
   });
 
-  for (const t of tasks) {
-    const isOverdue = t.dueDate && t.dueDate < now;
-    items.push({
-      id: `wq-task-${t.id}`,
-      sourceDomain: 'PRODUCTIVITY',
-      sourceId: t.id,
-      title: t.title,
-      subtitle: isOverdue ? 'OVERDUE TASK' : 'TASK DUE TODAY',
-      priority: isOverdue ? 'URGENT' : (t.priority as any) || 'MEDIUM',
-      dueDate: t.dueDate || undefined,
-      ownerId: actorUserId,
-      status: t.status,
-      deepLinkRoute: '/productivity/tasks',
-      recommendedAction: 'Complete Task',
+  if (member) {
+    const tasks = await db.task.findMany({
+      where: {
+        assigneeId: member.id,
+        status: { not: 'COMPLETED' },
+      },
+      take: 15,
+      orderBy: { dueDate: 'asc' },
     });
+
+    for (const t of tasks) {
+      const isOverdue = t.dueDate && t.dueDate < now;
+      items.push({
+        id: `wq-task-${t.id}`,
+        sourceDomain: 'PRODUCTIVITY',
+        sourceId: t.id,
+        title: t.title,
+        subtitle: isOverdue ? 'OVERDUE TASK' : 'TASK DUE TODAY',
+        priority: isOverdue ? 'URGENT' : (t.priority as any) || 'MEDIUM',
+        dueDate: t.dueDate || undefined,
+        ownerId: actorUserId,
+        status: t.status,
+        deepLinkRoute: '/productivity/tasks',
+        recommendedAction: 'Complete Task',
+      });
+    }
   }
 
   // 2. Retention Cases

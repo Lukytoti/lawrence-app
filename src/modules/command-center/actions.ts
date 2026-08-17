@@ -14,6 +14,7 @@ import { createRetentionCase } from '@/modules/retention/cases';
 import { executeWorkflow } from '@/modules/automation/executor';
 import { dispatchNotification } from '@/modules/notifications/dispatcher';
 import { db } from '@/lib/db';
+import { hasPermission } from '@/lib/rbac';
 
 export async function searchAllAction(input: SearchQueryInput, actorUserId: string) {
   return searchAll(input, actorUserId);
@@ -54,16 +55,40 @@ export async function executeQuickAction(
 ) {
   switch (actionType) {
     case 'CREATE_TASK': {
-      const member = await db.networkMember.findFirst({ where: { userId: actorUserId } });
-      const targetMemberId = member?.id || payload.assigneeId || actorUserId;
+      const authorized = await hasPermission(actorUserId, 'tasks:manage');
+      if (!authorized) {
+        throw new Error('Forbidden: Insufficient permissions to create tasks (tasks:manage required).');
+      }
+
+      let targetMemberId = payload.assigneeId;
+      if (!targetMemberId) {
+        const actorMember = await db.networkMember.findUnique({
+          where: { userId: actorUserId },
+        });
+        if (!actorMember) {
+          throw new Error('Network member profile not found for the current user.');
+        }
+        targetMemberId = actorMember.id;
+      } else {
+        const targetMember = await db.networkMember.findUnique({
+          where: { id: targetMemberId },
+        });
+        if (!targetMember) {
+          throw new Error(`Target network member not found: ${targetMemberId}`);
+        }
+      }
+
       return db.task.create({
         data: {
           title: payload.title,
-          description: payload.description,
+          description: payload.description || null,
           priority: payload.priority || 'MEDIUM',
           assigneeId: targetMemberId,
           assignedBy: actorUserId,
-          status: 'PENDING',
+          status: 'TODO',
+          dueDate: payload.dueDate ? new Date(payload.dueDate) : null,
+          goalId: payload.goalId || null,
+          projectId: payload.projectId || null,
         },
       });
     }
